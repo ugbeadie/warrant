@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PlatformRole {
+  USER
+  ADMIN
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  DENIED
+}
+
+enum GrantStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  EXPIRED
+}
+
+enum SubjectType {
+  USER
+  GROUP
+}
+
+model User {
+  id           String       @id @default(uuid())
+  email        String       @unique
+  username     String       @unique
+  password     String
+  platformRole PlatformRole @default(USER)
+  createdAt    DateTime     @default(now())
+
+  ownedResources   Resource[]      @relation("ResourceOwner")
+  groupMemberships GroupMember[]
+  requestsMade     AccessRequest[] @relation("Requester")
+  requestsApproved AccessRequest[] @relation("Approver")
+  notifications    Notification[]
+  auditLogEntries  AuditLog[]
+}
+
+model Group {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  members GroupMember[]
+}
+
+model GroupMember {
+  id        String           @id @default(uuid())
+  group     Group            @relation(fields: [groupId], references: [id])
+  groupId   String
+  user      User             @relation(fields: [userId], references: [id])
+  userId    String
+  expiresAt DateTime
+  status    MembershipStatus @default(ACTIVE)
+  createdAt DateTime         @default(now())
+
+  @@unique([groupId, userId])
+}
+
+model Role {
+  id   String @id @default(uuid())
+  name String @unique
+  rank Int    @unique
+
+  resources Resource[]
+  requests  AccessRequest[]
+  grants    Grant[]
+}
+
+model Resource {
+  id             String   @id @default(uuid())
+  name           String
+  owner          User     @relation("ResourceOwner", fields: [ownerId], references: [id])
+  ownerId        String
+  requiredRole   Role     @relation(fields: [requiredRoleId], references: [id])
+  requiredRoleId String
+  createdAt      DateTime @default(now())
+
+  requests    AccessRequest[]
+  grants      Grant[]
+  policyRules PolicyRule[]
+}
+
+model AccessRequest {
+  id              String        @id @default(uuid())
+  requester       User          @relation("Requester", fields: [requesterId], references: [id])
+  requesterId     String
+  resource        Resource      @relation(fields: [resourceId], references: [id])
+  resourceId      String
+  requestedRole   Role          @relation(fields: [requestedRoleId], references: [id])
+  requestedRoleId String
+  reason          String
+  durationMinutes Int
+  status          RequestStatus @default(PENDING)
+  approver        User?         @relation("Approver", fields: [approverId], references: [id])
+  approverId      String?
+  decidedAt       DateTime?
+  createdAt       DateTime      @default(now())
+
+  grant Grant?
+}
+
+model Grant {
+  id             String         @id @default(uuid())
+  request        AccessRequest? @relation(fields: [requestId], references: [id])
+  requestId      String?        @unique
+  subjectType    SubjectType
+  userId         String?
+  groupId        String?
+  resource       Resource       @relation(fields: [resourceId], references: [id])
+  resourceId     String
+  role           Role           @relation(fields: [roleId], references: [id])
+  roleId         String
+  grantedAt      DateTime       @default(now())
+  expiresAt      DateTime
+  status         GrantStatus    @default(ACTIVE)
+  lastAccessedAt DateTime?
+
+  @@index([resourceId, status])
+}
+
+model PolicyRule {
+  id          String   @id @default(uuid())
+  resource    Resource @relation(fields: [resourceId], references: [id])
+  resourceId  String
+  condition   Json
+  autoApprove Boolean  @default(false)
+  maxRoleId   String
+  createdAt   DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  type      String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actor      User     @relation(fields: [actorId], references: [id])
+  actorId    String
+  action     String
+  resourceId String?
+  detail     Json?
+  createdAt  DateTime @default(now())
+}
