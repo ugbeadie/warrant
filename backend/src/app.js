@@ -8,6 +8,8 @@ import groupRoute from "./routes/groupRoute.js";
 import accessRequestRoute from "./routes/accessRequestRoute.js";
 import policyRuleRoute from "./routes/policyRuleRoute.js";
 import grantRoute from "./routes/grantRoute.js";
+import startExpiryJob from "./jobs/expiryJob.js";
+import startUnusedAccessJob from "./jobs/unusedAccessJob.js";
 
 dotenv.config();
 
@@ -41,6 +43,8 @@ const startServer = async () => {
     console.log("Connected to PostgreSQL via Prisma");
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
+      startExpiryJob();
+      startUnusedAccessJob();
     });
   } catch (error) {
     console.error("Failed to start server:", error.message);

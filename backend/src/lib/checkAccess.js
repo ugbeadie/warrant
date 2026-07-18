@@ -24,6 +24,11 @@ const checkAccess = async (userId, resourceId) => {
   });
 
   if (directGrant && directGrant.role.rank >= resource.requiredRole.rank) {
+    await prisma.grant.update({
+      where: { id: directGrant.id },
+      data: { lastAccessedAt: now },
+    });
+
     return {
       hasAccess: true,
       reason: `Direct grant: you have "${directGrant.role.name}" access to this resource, expiring ${directGrant.expiresAt.toISOString()}.`,
@@ -54,6 +59,11 @@ const checkAccess = async (userId, resourceId) => {
     });
 
     if (groupGrant && groupGrant.role.rank >= resource.requiredRole.rank) {
+      await prisma.grant.update({
+        where: { id: groupGrant.id },
+        data: { lastAccessedAt: now },
+      });
+
       return {
         hasAccess: true,
         reason: `Group grant: you have access via membership in "${membership.group.name}", which has "${groupGrant.role.name}" access to this resource, expiring ${groupGrant.expiresAt.toISOString()}.`,
