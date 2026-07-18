@@ -81,7 +81,6 @@ const createAccessRequest = async (req, res) => {
         reason,
         durationMinutes,
         status: matchingRule ? "APPROVED" : "PENDING",
-        approverId: matchingRule ? null : undefined,
         decidedAt: matchingRule ? new Date() : null,
       },
       include: REQUEST_INCLUDE,
@@ -98,6 +97,19 @@ const createAccessRequest = async (req, res) => {
           resourceId,
           roleId: requestedRole.id,
           expiresAt: new Date(Date.now() + durationMinutes * 60 * 1000),
+        },
+      });
+    } else {
+      const resourceWithOwner = await prisma.resource.findUnique({
+        where: { id: resourceId },
+        select: { owner: { select: { id: true } } },
+      });
+
+      await prisma.notification.create({
+        data: {
+          userId: resourceWithOwner.owner.id,
+          type: "REQUEST_PENDING_APPROVAL",
+          message: `New access request from ${req.user.username} for "${resource.name}" needs your approval.`,
         },
       });
     }

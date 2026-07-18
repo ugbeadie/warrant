@@ -5,6 +5,7 @@ import {
   getMyResources,
   getResourceById,
   transferResourceOwnership,
+  attemptResourceAccess,
 } from "../controllers/resourceController.js";
 import { protect } from "../middlewares/authMiddleware.js";
 
@@ -15,5 +16,6 @@ router.get("/all", protect, getResources);
 router.get("/my-resources", protect, getMyResources);
 router.get("/:id", protect, getResourceById);
 router.post("/:id/transfer", protect, transferResourceOwnership);
+router.post("/:id/access", protect, attemptResourceAccess);
 
 export default router;

@@ -8,6 +8,7 @@ import groupRoute from "./routes/groupRoute.js";
 import accessRequestRoute from "./routes/accessRequestRoute.js";
 import policyRuleRoute from "./routes/policyRuleRoute.js";
 import grantRoute from "./routes/grantRoute.js";
+import notificationRoute from "./routes/notificationRoute.js";
 import startExpiryJob from "./jobs/expiryJob.js";
 import startUnusedAccessJob from "./jobs/unusedAccessJob.js";
 
@@ -36,6 +37,7 @@ app.use("/api/groups", groupRoute);
 app.use("/api/requests", accessRequestRoute);
 app.use("/api/policy-rules", policyRuleRoute);
 app.use("/api/grants", grantRoute);
+app.use("/api/notifications", notificationRoute);
 
 const startServer = async () => {
   try {
