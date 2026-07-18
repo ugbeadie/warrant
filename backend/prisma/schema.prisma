@@ -81,9 +81,10 @@ model Role {
   name String @unique
   rank Int    @unique
 
-  resources Resource[]
-  requests  AccessRequest[]
-  grants    Grant[]
+  resources        Resource[]
+  requests         AccessRequest[]
+  grants           Grant[]
+  policyRulesAsCap PolicyRule[]
 }
 
 model Resource {
@@ -144,6 +145,7 @@ model PolicyRule {
   resourceId  String
   condition   Json
   autoApprove Boolean  @default(false)
+  maxRole     Role     @relation(fields: [maxRoleId], references: [id])
   maxRoleId   String
   createdAt   DateTime @default(now())
 }

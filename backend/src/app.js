@@ -5,6 +5,8 @@ import prisma from "./config/prisma.js";
 import authRoute from "./routes/authRoute.js";
 import resourceRoute from "./routes/resourceRoute.js";
 import groupRoute from "./routes/groupRoute.js";
+import accessRequestRoute from "./routes/accessRequestRoute.js";
+import policyRuleRoute from "./routes/policyRuleRoute.js";
 
 dotenv.config();
 
@@ -28,6 +30,8 @@ app.get("/", (req, res) => {
 app.use("/api/auth", authRoute);
 app.use("/api/resources", resourceRoute);
 app.use("/api/groups", groupRoute);
+app.use("/api/requests", accessRequestRoute);
+app.use("/api/policy-rules", policyRuleRoute);
 
 const startServer = async () => {
   try {
