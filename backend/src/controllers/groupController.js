@@ -1,6 +1,7 @@
 import prisma from "../config/prisma.js";
 
 const GROUP_INCLUDE = {
+  owner: { select: { id: true, username: true, email: true } },
   members: {
     where: { status: "ACTIVE" },
     include: { user: { select: { id: true, username: true, email: true } } },
@@ -9,13 +10,29 @@ const GROUP_INCLUDE = {
 
 const createGroup = async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, isDepartment } = req.body;
 
     if (!name) {
       return res.status(400).json({ message: "name is required" });
     }
 
-    const group = await prisma.group.create({ data: { name } });
+    const wantsDepartment = !!isDepartment;
+    const isAdmin = req.user.role === "ADMIN";
+
+    if (wantsDepartment && !isAdmin) {
+      return res
+        .status(403)
+        .json({ message: "Only an admin can create a department" });
+    }
+
+    const group = await prisma.group.create({
+      data: {
+        name,
+        isDepartment: wantsDepartment,
+        ownerId: req.user.id,
+      },
+      include: GROUP_INCLUDE,
+    });
 
     res.status(201).json({ message: "Group created successfully", group });
   } catch (error) {
@@ -66,20 +83,21 @@ const addMember = async (req, res) => {
         .json({ message: "userId and durationMinutes are required" });
     }
 
-    const isAdmin = req.user.role === "ADMIN";
-
-    if (!isAdmin) {
-      return res
-        .status(403)
-        .json({ message: "Only an admin can add group members" });
-    }
-
     const group = await prisma.group.findUnique({
       where: { id: req.params.id },
     });
 
     if (!group) {
       return res.status(404).json({ message: "Group not found" });
+    }
+
+    const isOwner = group.ownerId === req.user.id;
+    const isAdmin = req.user.role === "ADMIN";
+
+    if (!isOwner && !isAdmin) {
+      return res
+        .status(403)
+        .json({ message: "Only the group owner or admin can add members" });
     }
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -115,12 +133,21 @@ const removeMember = async (req, res) => {
       return res.status(400).json({ message: "userId is required" });
     }
 
+    const group = await prisma.group.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    const isOwner = group.ownerId === req.user.id;
     const isAdmin = req.user.role === "ADMIN";
 
-    if (!isAdmin) {
+    if (!isOwner && !isAdmin) {
       return res
         .status(403)
-        .json({ message: "Only an admin can remove group members" });
+        .json({ message: "Only the group owner or admin can remove members" });
     }
 
     await prisma.groupMember.updateMany({
@@ -135,4 +162,60 @@ const removeMember = async (req, res) => {
   }
 };
 
-export { createGroup, getGroups, getGroupById, addMember, removeMember };
+const transferGroupOwnership = async (req, res) => {
+  try {
+    const { newOwnerId } = req.body;
+
+    if (!newOwnerId) {
+      return res.status(400).json({ message: "newOwnerId is required" });
+    }
+
+    const group = await prisma.group.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    const isOwner = group.ownerId === req.user.id;
+    const isAdmin = req.user.role === "ADMIN";
+
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({
+        message: "Only the current owner or admin can transfer ownership",
+      });
+    }
+
+    const newOwner = await prisma.user.findUnique({
+      where: { id: newOwnerId },
+    });
+
+    if (!newOwner) {
+      return res.status(404).json({ message: "New owner not found" });
+    }
+
+    const updatedGroup = await prisma.group.update({
+      where: { id: req.params.id },
+      data: { ownerId: newOwnerId },
+      include: GROUP_INCLUDE,
+    });
+
+    res.status(200).json({
+      message: "Ownership transferred successfully",
+      group: updatedGroup,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export {
+  createGroup,
+  getGroups,
+  getGroupById,
+  addMember,
+  removeMember,
+  transferGroupOwnership,
+};

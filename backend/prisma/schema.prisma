@@ -44,6 +44,7 @@ model User {
   createdAt    DateTime     @default(now())
 
   ownedResources   Resource[]      @relation("ResourceOwner")
+  ownedGroups      Group[]         @relation("GroupOwner")
   groupMemberships GroupMember[]
   requestsMade     AccessRequest[] @relation("Requester")
   requestsApproved AccessRequest[] @relation("Approver")
@@ -52,9 +53,12 @@ model User {
 }
 
 model Group {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  createdAt DateTime @default(now())
+  id           String   @id @default(uuid())
+  name         String   @unique
+  isDepartment Boolean  @default(false)
+  owner        User     @relation("GroupOwner", fields: [ownerId], references: [id])
+  ownerId      String
+  createdAt    DateTime @default(now())
 
   members GroupMember[]
 }
