@@ -1,20 +1,29 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { Shield } from "lucide-react";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
 import ResourceDetailPage from "./pages/ResourceDetailPage";
 import type { ReactNode } from "react";
 
+const LoadingScreen = () => (
+  <div className="flex flex-col items-center justify-center min-h-screen bg-bg gap-4">
+    <div className="relative flex items-center justify-center">
+      <div className="h-12 w-12 rounded-full border-2 border-border-dark border-t-brand animate-spin" />
+      <Shield className="absolute h-5 w-5 text-brand" />
+    </div>
+    <p className="text-xs font-mono uppercase tracking-widest text-on-dark-muted">
+      Verifying session...
+    </p>
+  </div>
+);
+
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const { user, sessionLoading } = useAuth();
 
   if (sessionLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen text-sm text-gray-500">
-        Loading...
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (!user) return <Navigate to="/login" replace />;
@@ -51,7 +60,7 @@ const AppRoutes = () => {
 const App = () => {
   return (
     <AuthProvider>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-bg">
         <AppRoutes />
       </div>
     </AuthProvider>

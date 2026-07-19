@@ -1,16 +1,35 @@
 @import "tailwindcss";
 
+html {
+  background-color: var(--color-bg);
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-bg);
+  color: var(--color-on-dark);
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-on-dark);
+  transition: background-color 9999s ease-in-out 0s;
+  box-shadow: 0 0 0px 1000px var(--color-bg) inset;
+}
+
 @theme {
   /* Base surfaces */
-  --color-bg: #f8fafc;
+  --color-bg: #0f172a;
   --color-surface: #ffffff;
-  --color-surface-raised: #0f172a;
+  --color-surface-raised: #0b1120;
 
   /* Text */
   --color-primary: #0f172a;
   --color-secondary: #64748b;
   --color-muted: #94a3b8;
   --color-on-dark: #f1f5f9;
+  --color-on-dark-muted: #94a3b8;
 
   /* Borders */
   --color-border: #e2e8f0;
@@ -34,10 +53,4 @@
   /* Fonts */
   --font-sans: "Montserrat", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
-}
-
-body {
-  font-family: var(--font-sans);
-  background-color: var(--color-bg);
-  color: var(--color-primary);
 }

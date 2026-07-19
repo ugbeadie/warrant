@@ -23,11 +23,11 @@ export const AuthForm = ({ mode, onSuccess }: AuthFormProps) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-sm font-sans">
-      <h1 className="text-2xl font-semibold text-primary tracking-tight">
+    <form onSubmit={handleSubmit} className="w-full max-w-sm">
+      <h1 className="text-2xl font-semibold text-on-dark tracking-tight">
         {isLogin ? "Welcome back" : "Create your account"}
       </h1>
-      <p className="mt-2 text-sm text-secondary">
+      <p className="mt-2 text-sm text-on-dark-muted">
         {isLogin
           ? "Sign in to manage access requests."
           : "Access, but never permanent."}
@@ -38,7 +38,7 @@ export const AuthForm = ({ mode, onSuccess }: AuthFormProps) => {
           <div>
             <label
               htmlFor="username"
-              className="block text-xs font-medium text-secondary mb-1.5"
+              className="block text-xs font-medium text-on-dark-muted mb-1.5"
             >
               Username
             </label>
@@ -51,7 +51,7 @@ export const AuthForm = ({ mode, onSuccess }: AuthFormProps) => {
                 clearAuthError();
               }}
               required
-              className="w-full rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm text-primary placeholder:text-muted outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+              className="w-full rounded-lg border border-border-dark bg-bg px-3.5 py-2.5 text-sm text-on-dark placeholder:text-on-dark-muted outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
               placeholder="jane_doe"
             />
           </div>
@@ -60,7 +60,7 @@ export const AuthForm = ({ mode, onSuccess }: AuthFormProps) => {
         <div>
           <label
             htmlFor="email"
-            className="block text-xs font-medium text-secondary mb-1.5"
+            className="block text-xs font-medium text-on-dark-muted mb-1.5"
           >
             Email
           </label>
@@ -73,7 +73,7 @@ export const AuthForm = ({ mode, onSuccess }: AuthFormProps) => {
               clearAuthError();
             }}
             required
-            className="w-full rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm text-primary placeholder:text-muted outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+            className="w-full rounded-lg border border-border-dark bg-bg px-3.5 py-2.5 text-sm text-on-dark placeholder:text-on-dark-muted outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
             placeholder="you@company.com"
           />
         </div>
@@ -81,7 +81,7 @@ export const AuthForm = ({ mode, onSuccess }: AuthFormProps) => {
         <div>
           <label
             htmlFor="password"
-            className="block text-xs font-medium text-secondary mb-1.5"
+            className="block text-xs font-medium text-on-dark-muted mb-1.5"
           >
             Password
           </label>
@@ -94,7 +94,7 @@ export const AuthForm = ({ mode, onSuccess }: AuthFormProps) => {
               clearAuthError();
             }}
             required
-            className="w-full rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm text-primary placeholder:text-muted outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+            className="w-full rounded-lg border border-border-dark bg-bg px-3.5 py-2.5 text-sm text-on-dark placeholder:text-on-dark-muted outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
             placeholder="••••••••"
           />
         </div>
@@ -109,7 +109,7 @@ export const AuthForm = ({ mode, onSuccess }: AuthFormProps) => {
       <button
         type="submit"
         disabled={authLoading}
-        className="mt-6 w-full rounded-lg bg-surface-raised px-4 py-2.5 cursor-pointer text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="mt-6 w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white cursor-pointer transition hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {authLoading ? "Please wait..." : isLogin ? "Login" : "Create account"}
       </button>
