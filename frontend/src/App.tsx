@@ -5,6 +5,12 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
 import ResourceDetailPage from "./pages/ResourceDetailPage";
+import ResourcesPage from "./pages/ResourcesPage";
+import MyAccessPage from "./pages/MyAccessPage";
+import ApprovalsPage from "./pages/ApprovalsPage";
+import GroupsPage from "./pages/GroupsPage";
+import AuditLogPage from "./pages/AuditLogPage";
+import AdminPage from "./pages/AdminPage";
 import type { ReactNode } from "react";
 
 const LoadingScreen = () => (
@@ -31,6 +37,19 @@ const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   return <>{children}</>;
 };
 
+const AdminRoute = ({ children }: { children: ReactNode }) => {
+  const { user, sessionLoading } = useAuth();
+
+  if (sessionLoading) {
+    return <LoadingScreen />;
+  }
+
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== "ADMIN") return <Navigate to="/" replace />;
+
+  return <>{children}</>;
+};
+
 const AppRoutes = () => {
   return (
     <Routes>
@@ -45,11 +64,59 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/resources"
+        element={
+          <ProtectedRoute>
+            <ResourcesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/resources/:id"
         element={
           <ProtectedRoute>
             <ResourceDetailPage />
           </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/my-access"
+        element={
+          <ProtectedRoute>
+            <MyAccessPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/approvals"
+        element={
+          <ProtectedRoute>
+            <ApprovalsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/groups"
+        element={
+          <ProtectedRoute>
+            <GroupsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/audit-log"
+        element={
+          <ProtectedRoute>
+            <AuditLogPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <AdminRoute>
+            <AdminPage />
+          </AdminRoute>
         }
       />
       <Route path="*" element={<Navigate to="/" replace />} />

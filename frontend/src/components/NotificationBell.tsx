@@ -50,10 +50,10 @@ export const NotificationBell = () => {
     <div className="relative">
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="relative flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-border-dark"
+        className="relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-full transition hover:bg-border-dark"
       >
-        <span className="text-sm">
-          <Bell className="text-on-dark-muted w-5 h-5 cursor-pointer" />
+        <span className="text-sm ">
+          <Bell className="text-on-dark-muted w-5 h-5 " />
         </span>
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-danger text-[10px] font-medium text-white font-mono">

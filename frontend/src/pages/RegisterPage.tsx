@@ -29,14 +29,14 @@ const RegisterPage = () => {
 
       <div className="flex items-center justify-center bg-surface-raised px-6 py-12">
         <div className="w-full max-w-sm">
-          <AuthForm mode="login" onSuccess={() => navigate("/")} />
-          <p className="mt-6 text-center text-sm text-secondary">
+          <AuthForm mode="register" onSuccess={() => navigate("/")} />
+          <p className="mt-6 text-center text-sm text-on-dark-muted">
             Already have an account?{" "}
             <Link
               to="/login"
-              className="font-medium text-primary hover:underline"
+              className="font-medium text-on-dark-muted hover:underline"
             >
-              Sign in
+              Login
             </Link>
           </p>
         </div>

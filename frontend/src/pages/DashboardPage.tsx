@@ -228,7 +228,7 @@ const DashboardPage = () => {
                     <Link
                       key={resource.id}
                       to={`/resources/${resource.id}`}
-                      className="flex items-center justify-between px-5 py-4 border-b border-border-dark last:border-0 hover:bg-bg transition"
+                      className="group flex items-center justify-between px-5 py-4 border-b border-border-dark last:border-0 hover:bg-bg transition"
                     >
                       <div>
                         <div className="flex items-center gap-2">
@@ -238,7 +238,7 @@ const DashboardPage = () => {
                           <span
                             className={`rounded px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wide ${
                               ROLE_BADGE_STYLES[roleKey] ??
-                              "bg-neutral-bg text-neutral"
+                              "bg-neutral/15 text-neutral"
                             }`}
                           >
                             {resource.requiredRole.name}
@@ -248,7 +248,9 @@ const DashboardPage = () => {
                           requires: {resource.requiredRole.name}
                         </p>
                       </div>
-                      <span className="text-on-dark-muted">›</span>
+                      <span className="text-on-dark-muted transition-transform group-hover:translate-x-1 group-hover:text-brand">
+                        ›
+                      </span>
                     </Link>
                   );
                 })
