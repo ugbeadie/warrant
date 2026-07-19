@@ -13,3 +13,10 @@ export const markNotificationRead = async (id: string): Promise<void> => {
 export const markAllNotificationsRead = async (): Promise<void> => {
   await api.patch("/notifications/read-all");
 };
+
+export const setNotificationReadStatus = async (
+  id: string,
+  read: boolean,
+): Promise<void> => {
+  await api.patch(`/notifications/${id}`, { read });
+};

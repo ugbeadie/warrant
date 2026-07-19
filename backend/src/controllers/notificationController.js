@@ -56,4 +56,41 @@ const markAllAsRead = async (req, res) => {
   }
 };
 
-export { getMyNotifications, markAsRead, markAllAsRead };
+const setReadStatus = async (req, res) => {
+  try {
+    const { read } = req.body;
+
+    if (typeof read !== "boolean") {
+      return res.status(400).json({ message: "'read' must be a boolean" });
+    }
+
+    const notification = await prisma.notification.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!notification) {
+      return res.status(404).json({ message: "Notification not found" });
+    }
+
+    if (notification.userId !== req.user.id) {
+      return res
+        .status(403)
+        .json({ message: "You cannot modify another user's notification" });
+    }
+
+    const updated = await prisma.notification.update({
+      where: { id: req.params.id },
+      data: { read },
+    });
+
+    res.status(200).json({
+      message: read ? "Marked as read" : "Marked as unread",
+      notification: updated,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export { getMyNotifications, markAsRead, markAllAsRead, setReadStatus };

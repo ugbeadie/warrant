@@ -3,7 +3,25 @@ import type { Notification } from "../types";
 import {
   fetchMyNotifications,
   markAllNotificationsRead,
+  setNotificationReadStatus,
 } from "../lib/notifications";
+import { Bell } from "lucide-react";
+
+const timeAgo = (date: string) => {
+  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
+  const intervals: [number, string][] = [
+    [31536000, "year"],
+    [2592000, "month"],
+    [86400, "day"],
+    [3600, "hour"],
+    [60, "minute"],
+  ];
+  for (const [secs, label] of intervals) {
+    const count = Math.floor(seconds / secs);
+    if (count >= 1) return `about ${count} ${label}${count > 1 ? "s" : ""} ago`;
+  }
+  return "just now";
+};
 
 export const NotificationBell = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -22,13 +40,36 @@ export const NotificationBell = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   };
 
+  const handleNotificationClick = async (n: Notification) => {
+    const nextRead = !n.read;
+    const previous = n.read;
+
+    setNotifications((prev) =>
+      prev.map((item) =>
+        item.id === n.id ? { ...item, read: nextRead } : item,
+      ),
+    );
+
+    try {
+      await setNotificationReadStatus(n.id, nextRead);
+    } catch {
+      setNotifications((prev) =>
+        prev.map((item) =>
+          item.id === n.id ? { ...item, read: previous } : item,
+        ),
+      );
+    }
+  };
+
   return (
     <div className="relative">
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="relative flex h-9 w-9 items-center justify-center rounded-full border border-border-dark bg-surface-raised hover:bg-border-dark transition"
+        className="relative flex h-9 w-9 items-center justify-center rounded-full transition"
       >
-        <span className="text-sm">🔔</span>
+        <span className="text-sm">
+          <Bell className="text-on-dark-muted w-5 h-5 cursor-pointer" />
+        </span>
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-danger text-[10px] font-medium text-white font-mono">
             {unreadCount}
@@ -37,34 +78,47 @@ export const NotificationBell = () => {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 rounded-xl border border-border bg-surface shadow-lg z-10">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-            <p className="text-sm font-medium text-primary">Notifications</p>
+        <div className="absolute right-0 mt-2 w-80 rounded-xl border border-border-dark bg-surface-raised shadow-lg z-10">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border-dark">
+            <p className="text-xs font-mono font-semibold uppercase tracking-widest text-on-dark">
+              Notifications
+            </p>
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllRead}
-                className="text-xs text-brand hover:underline"
+                className="text-[11px] font-mono uppercase cursor-pointer tracking-wide text-brand hover:text-brand-hover"
               >
-                Mark all as read
+                Mark_Read
               </button>
             )}
           </div>
 
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-80 overflow-y-auto p-2 space-y-2 scrollbar-thin">
             {notifications.length === 0 && (
-              <p className="px-4 py-6 text-center text-sm text-muted">
+              <p className="px-4 py-6 text-center text-sm text-on-dark-muted">
                 No notifications yet.
               </p>
             )}
             {notifications.map((n) => (
               <div
                 key={n.id}
-                className={`px-4 py-3 border-b border-border last:border-0 ${n.read ? "" : "bg-brand-light"}`}
+                onClick={() => handleNotificationClick(n)}
+                className={`relative flex gap-2.5 rounded-lg px-3 py-3 border border-border-dark cursor-pointer transition hover:border-on-dark-muted ${
+                  n.read ? "bg-bg" : "bg-brand/5"
+                }`}
               >
-                <p className="text-sm text-primary">{n.message}</p>
-                <p className="mt-1 text-xs text-muted font-mono">
-                  {new Date(n.createdAt).toLocaleString()}
-                </p>
+                {!n.read && (
+                  <span className="absolute left-0 top-0 h-full w-0.5 rounded-l-lg bg-brand" />
+                )}
+                <Bell className="h-4 w-4 shrink-0 mt-0.5 text-on-dark-muted" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-on-dark leading-snug">
+                    {n.message}
+                  </p>
+                  <p className="mt-1 text-xs text-on-dark-muted font-mono">
+                    {timeAgo(n.createdAt)}
+                  </p>
+                </div>
               </div>
             ))}
           </div>

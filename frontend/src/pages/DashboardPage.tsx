@@ -39,14 +39,25 @@ const DashboardPage = () => {
 
   const flaggedUnused = resources.filter((r) => (r as any).unused).length;
 
+  const sortedPendingRequests = [...pendingRequests].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+
+  const sortedResources = [...resources].sort((a, b) => {
+    const aDate = (a as any).createdAt;
+    const bDate = (b as any).createdAt;
+    if (!aDate || !bDate) return 0;
+    return new Date(bDate).getTime() - new Date(aDate).getTime();
+  });
+
   return (
     <AppLayout>
-      <div className="max-w-6xl">
-        <h1 className="text-2xl font-semibold text-on-dark tracking-tight">
+      <div className="">
+        <h1 className="text-2xl font-mono font-semibold text-on-dark tracking-tight">
           SYSTEM_OVERVIEW
         </h1>
         <p className="mt-1 text-sm text-on-dark-muted">
-          Welcome back, {user?.username ?? "there"}.
+          Welcome back, {user?.username ?? "user"}.
         </p>
 
         <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -113,7 +124,7 @@ const DashboardPage = () => {
           )}
         </div>
 
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
           <div className="rounded-xl border border-border-dark bg-surface-raised">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border-dark">
               <p className="text-xs font-mono uppercase tracking-widest text-on-dark-muted">
@@ -133,12 +144,12 @@ const DashboardPage = () => {
                   <SkeletonRow />
                   <SkeletonRow />
                 </>
-              ) : pendingRequests.length === 0 ? (
-                <p className="px-5 py-6 text-sm text-on-dark-muted">
+              ) : sortedPendingRequests.length === 0 ? (
+                <p className="px-5 py-6 text-sm text-center text-on-dark-muted">
                   No recent activity.
                 </p>
               ) : (
-                pendingRequests.map((req) => (
+                sortedPendingRequests.map((req) => (
                   <div
                     key={req.id}
                     className="px-5 py-4 border-b border-border-dark last:border-0"
@@ -147,7 +158,7 @@ const DashboardPage = () => {
                       <span className="font-medium">
                         {req.requester?.username}
                       </span>{" "}
-                      requested on{" "}
+                      requested access to{" "}
                       <span className="rounded bg-bg px-1.5 py-0.5 text-xs font-mono text-on-dark-muted">
                         {req.resource?.name}
                       </span>
@@ -180,12 +191,12 @@ const DashboardPage = () => {
                   <SkeletonRow />
                   <SkeletonRow />
                 </>
-              ) : resources.length === 0 ? (
-                <p className="px-5 py-6 text-sm text-on-dark-muted">
+              ) : sortedResources.length === 0 ? (
+                <p className="px-5 py-6 text-sm text-center text-on-dark-muted">
                   No resources yet.
                 </p>
               ) : (
-                resources.map((resource) => {
+                sortedResources.map((resource) => {
                   const roleKey = resource.requiredRole.name.toLowerCase();
                   return (
                     <Link
