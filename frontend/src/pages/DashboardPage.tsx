@@ -2,46 +2,91 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { fetchMyResources } from "../lib/resources";
 import { fetchPendingForOwner } from "../lib/requests";
+import { fetchMyAuditLog, fetchAllAuditLog } from "../lib/auditLog";
 import { AppLayout } from "../components/AppLayout";
 import { SkeletonCard } from "../components/SkeletonCard";
 import { SkeletonRow } from "../components/SkeletonRow";
+import { SummaryCard } from "../components/SummaryCard";
 import { useAuth } from "../context/AuthContext";
-import type { Resource, AccessRequest } from "../types";
+import type { Resource, AccessRequest, AuditLogEntry } from "../types";
+import { CheckCircle, Key, TriangleAlert } from "lucide-react";
+import { timeAgo } from "../lib/timeAgo";
 
 const ROLE_BADGE_STYLES: Record<string, string> = {
-  admin: "bg-danger-bg text-danger",
-  editor: "bg-warning-bg text-warning",
-  viewer: "bg-neutral-bg text-neutral",
+  admin: "bg-danger/15 text-danger",
+  editor: "bg-warning/15 text-warning",
+  viewer: "bg-neutral/15 text-neutral",
+};
+
+type ActivityPart = { text: string; emphasize?: boolean };
+
+const ACTION_TEMPLATES: Record<
+  string,
+  (entry: AuditLogEntry) => ActivityPart[]
+> = {
+  REQUEST_PENDING_APPROVAL: (e) => [
+    { text: `${e.actor?.username} requested access to ` },
+    { text: e.resource?.name ?? "a resource", emphasize: true },
+  ],
+  GRANT_EXPIRED: (e) => [
+    { text: `${e.actor?.username}'s access to ` },
+    { text: e.resource?.name ?? "a resource", emphasize: true },
+    { text: " expired" },
+  ],
+  GROUP_MEMBERSHIP_EXPIRED: (e) => [
+    { text: `${e.actor?.username}'s group membership expired` },
+  ],
+  GRANT_FLAGGED_UNUSED: (e) => [
+    { text: "Access to " },
+    { text: e.resource?.name ?? "a resource", emphasize: true },
+    { text: " was flagged as unused" },
+  ],
+  UNAUTHORIZED_ACCESS_ATTEMPT: (e) => [
+    { text: `${e.actor?.username} was denied access to ` },
+    { text: e.resource?.name ?? "a resource", emphasize: true },
+  ],
+};
+
+const formatActivity = (entry: AuditLogEntry): ActivityPart[] => {
+  const template = ACTION_TEMPLATES[entry.action];
+  if (template) return template(entry);
+  return [
+    {
+      text: `${entry.actor?.username} — ${entry.action.toLowerCase().replace(/_/g, " ")}`,
+    },
+  ];
 };
 
 const DashboardPage = () => {
   const { user } = useAuth();
   const [resources, setResources] = useState<Resource[]>([]);
   const [pendingRequests, setPendingRequests] = useState<AccessRequest[]>([]);
+  const [activity, setActivity] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [resourcesData, pendingData] = await Promise.all([
+        const activityPromise =
+          user?.role === "ADMIN" ? fetchAllAuditLog(5) : fetchMyAuditLog(5);
+
+        const [resourcesData, pendingData, activityData] = await Promise.all([
           fetchMyResources(),
           fetchPendingForOwner(),
+          activityPromise,
         ]);
         setResources(resourcesData);
         setPendingRequests(pendingData);
+        setActivity(activityData);
       } finally {
         setLoading(false);
       }
     };
 
     load();
-  }, []);
+  }, [user?.role]);
 
   const flaggedUnused = resources.filter((r) => (r as any).unused).length;
-
-  const sortedPendingRequests = [...pendingRequests].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  );
 
   const sortedResources = [...resources].sort((a, b) => {
     const aDate = (a as any).createdAt;
@@ -69,57 +114,31 @@ const DashboardPage = () => {
             </>
           ) : (
             <>
-              <div className="rounded-xl border border-border-dark bg-surface-raised p-5">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-mono uppercase tracking-widest text-on-dark-muted">
-                    Pending Approvals
-                  </p>
-                  <span className="text-warning">◷</span>
-                </div>
-                <p className="mt-3 text-3xl font-semibold text-on-dark font-mono">
-                  {pendingRequests.length}
-                </p>
-                <Link
-                  to="/approvals"
-                  className="mt-2 inline-block text-xs font-medium text-brand hover:text-brand-hover"
-                >
-                  Review requests →
-                </Link>
-              </div>
+              <SummaryCard
+                label="Pending Approvals"
+                value={pendingRequests.length}
+                accent="warning"
+                icon={<CheckCircle className="w-4 h-4" />}
+                linkTo="/approvals"
+                linkLabel="Review requests →"
+              />
 
-              <div className="rounded-xl border border-border-dark bg-surface-raised p-5">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-mono uppercase tracking-widest text-on-dark-muted">
-                    Active Grants
-                  </p>
-                  <span className="text-brand">⚿</span>
-                </div>
-                <p className="mt-3 text-3xl font-semibold text-on-dark font-mono">
-                  {resources.length}
-                </p>
-                <Link
-                  to="/resources"
-                  className="mt-2 inline-block text-xs font-medium text-brand hover:text-brand-hover"
-                >
-                  View my access →
-                </Link>
-              </div>
+              <SummaryCard
+                label="Active Grants"
+                value={resources.length}
+                accent="brand"
+                icon={<Key className="w-4 h-4" />}
+                linkTo="/resources"
+                linkLabel="View my access →"
+              />
 
-              <div className="rounded-xl border border-border-dark bg-surface-raised p-5">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-mono uppercase tracking-widest text-on-dark-muted">
-                    Flagged Unused
-                  </p>
-                  <span className="text-danger">⚠</span>
-                </div>
-                <p className="mt-3 text-3xl font-semibold text-on-dark font-mono">
-                  {flaggedUnused}
-                </p>
-                <p className="mt-2 text-xs text-on-dark-muted">
-                  {flaggedUnused} resource{flaggedUnused === 1 ? "" : "s"}{" "}
-                  unused
-                </p>
-              </div>
+              <SummaryCard
+                label="Flagged Unused"
+                value={flaggedUnused}
+                accent="danger"
+                icon={<TriangleAlert className="w-4 h-4" />}
+                description={`${flaggedUnused} resource${flaggedUnused === 1 ? "" : "s"} unused`}
+              />
             </>
           )}
         </div>
@@ -128,7 +147,9 @@ const DashboardPage = () => {
           <div className="rounded-xl border border-border-dark bg-surface-raised">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border-dark">
               <p className="text-xs font-mono uppercase tracking-widest text-on-dark-muted">
-                Recent Activity
+                {user?.role === "ADMIN"
+                  ? "Platform Activity"
+                  : "Recent Activity"}
               </p>
               <Link
                 to="/audit-log"
@@ -144,27 +165,32 @@ const DashboardPage = () => {
                   <SkeletonRow />
                   <SkeletonRow />
                 </>
-              ) : sortedPendingRequests.length === 0 ? (
+              ) : activity.length === 0 ? (
                 <p className="px-5 py-6 text-sm text-center text-on-dark-muted">
                   No recent activity.
                 </p>
               ) : (
-                sortedPendingRequests.map((req) => (
+                activity.map((entry) => (
                   <div
-                    key={req.id}
+                    key={entry.id}
                     className="px-5 py-4 border-b border-border-dark last:border-0"
                   >
                     <p className="text-sm text-on-dark">
-                      <span className="font-medium">
-                        {req.requester?.username}
-                      </span>{" "}
-                      requested access to{" "}
-                      <span className="rounded bg-bg px-1.5 py-0.5 text-xs font-mono text-on-dark-muted">
-                        {req.resource?.name}
-                      </span>
+                      {formatActivity(entry).map((part, i) =>
+                        part.emphasize ? (
+                          <span
+                            key={i}
+                            className="rounded bg-bg px-1.5 py-0.5 text-xs font-mono text-on-dark-muted"
+                          >
+                            {part.text}
+                          </span>
+                        ) : (
+                          <span key={i}>{part.text}</span>
+                        ),
+                      )}
                     </p>
                     <p className="mt-1 text-xs text-on-dark-muted font-mono">
-                      {new Date(req.createdAt).toLocaleString()}
+                      {timeAgo(entry.createdAt)}
                     </p>
                   </div>
                 ))

@@ -96,9 +96,10 @@ model Resource {
   requiredRoleId String
   createdAt      DateTime @default(now())
 
-  requests    AccessRequest[]
-  grants      Grant[]
-  policyRules PolicyRule[]
+  requests        AccessRequest[]
+  grants          Grant[]
+  policyRules     PolicyRule[]
+  auditLogEntries AuditLog[]
 }
 
 model AccessRequest {
@@ -162,10 +163,12 @@ model Notification {
 
 model AuditLog {
   id         String   @id @default(uuid())
-  actor      User     @relation(fields: [actorId], references: [id])
   actorId    String
   action     String
   resourceId String?
   detail     Json?
   createdAt  DateTime @default(now())
+
+  actor    User      @relation(fields: [actorId], references: [id])
+  resource Resource? @relation(fields: [resourceId], references: [id])
 }

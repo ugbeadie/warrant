@@ -107,3 +107,14 @@ export interface CheckAccessResult {
   group?: Group;
   grant?: Grant;
 }
+
+export interface AuditLogEntry {
+  id: string;
+  actorId: string;
+  action: string;
+  resourceId: string | null;
+  detail: Record<string, unknown> | null;
+  createdAt: string;
+  actor: User;
+  resource: { id: string; name: string } | null;
+}

@@ -5,23 +5,8 @@ import {
   markAllNotificationsRead,
   setNotificationReadStatus,
 } from "../lib/notifications";
+import { timeAgo } from "../lib/timeAgo";
 import { Bell } from "lucide-react";
-
-const timeAgo = (date: string) => {
-  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
-  const intervals: [number, string][] = [
-    [31536000, "year"],
-    [2592000, "month"],
-    [86400, "day"],
-    [3600, "hour"],
-    [60, "minute"],
-  ];
-  for (const [secs, label] of intervals) {
-    const count = Math.floor(seconds / secs);
-    if (count >= 1) return `about ${count} ${label}${count > 1 ? "s" : ""} ago`;
-  }
-  return "just now";
-};
 
 export const NotificationBell = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -65,7 +50,7 @@ export const NotificationBell = () => {
     <div className="relative">
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="relative flex h-9 w-9 items-center justify-center rounded-full transition"
+        className="relative flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-border-dark"
       >
         <span className="text-sm">
           <Bell className="text-on-dark-muted w-5 h-5 cursor-pointer" />

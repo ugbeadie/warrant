@@ -11,6 +11,7 @@ import grantRoute from "./routes/grantRoute.js";
 import notificationRoute from "./routes/notificationRoute.js";
 import startExpiryJob from "./jobs/expiryJob.js";
 import startUnusedAccessJob from "./jobs/unusedAccessJob.js";
+import auditLogRoute from "./routes/auditLogRoute.js";
 // import { authLimiter, generalLimiter } from "./middlewares/rateLimiter.js";
 
 dotenv.config();
@@ -42,6 +43,7 @@ app.use("/api/requests", accessRequestRoute);
 app.use("/api/policy-rules", policyRuleRoute);
 app.use("/api/grants", grantRoute);
 app.use("/api/notifications", notificationRoute);
+app.use("/api/audit-log", auditLogRoute);
 
 const startServer = async () => {
   try {
