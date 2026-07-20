@@ -13,12 +13,14 @@ const DURATION_OPTIONS = [
 
 interface RequestAccessModalProps {
   resource: Resource;
+  isOwner?: boolean;
   onClose: () => void;
   onSubmitted: () => void;
 }
 
 export const RequestAccessModal = ({
   resource,
+  isOwner = false,
   onClose,
   onSubmitted,
 }: RequestAccessModalProps) => {
@@ -30,6 +32,8 @@ export const RequestAccessModal = ({
   const [likelyAutoApprove, setLikelyAutoApprove] = useState(false);
 
   useEffect(() => {
+    if (isOwner) return;
+
     fetchPolicyRulesForResource(resource.id)
       .then((rules) => {
         const match = rules.some(
@@ -41,7 +45,7 @@ export const RequestAccessModal = ({
         setLikelyAutoApprove(match);
       })
       .catch(() => setLikelyAutoApprove(false));
-  }, [resource.id, durationMinutes]);
+  }, [resource.id, durationMinutes, isOwner]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,7 +137,12 @@ export const RequestAccessModal = ({
             />
           </div>
 
-          {likelyAutoApprove ? (
+          {isOwner ? (
+            <div className="rounded-md border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
+              You own this resource — this will auto-approve instantly and be
+              logged for audit purposes.
+            </div>
+          ) : likelyAutoApprove ? (
             <div className="rounded-md border border-success/20 bg-success/10 px-3 py-2 text-xs text-success">
               This request will likely be auto-approved based on policy.
             </div>

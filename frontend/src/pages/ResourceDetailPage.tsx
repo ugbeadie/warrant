@@ -1,23 +1,29 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ChevronRight, CheckCircle2, XCircle } from "lucide-react";
+import { ChevronRight, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import {
   fetchResourceById,
   checkResourceAccess,
   fetchGrantsForResource,
   revokeGrant as revokeGrantApi,
+  deleteResource,
+  deleteGrant,
 } from "../lib/resources";
+import { fetchMyRequestForResource } from "../lib/requests";
 import { AppLayout } from "../components/AppLayout";
 import { ResourceDetailSkeleton } from "../components/ResourceDetailSkeleton";
 import { RequestAccessModal } from "../components/RequestAccessModal";
-import { useAuth } from "../context/AuthContext";
-import type { Resource, CheckAccessResult, Grant } from "../types";
-import { Pencil, Trash2 } from "lucide-react";
-import { deleteResource } from "../lib/resources";
-import { deleteGrant } from "../lib/resources";
 import { EditResourceModal } from "../components/EditResourceModal";
-import { useNavigate } from "react-router-dom";
 import { ConfirmDeleteModal } from "../components/ConfirmDeleteModal";
+import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
+import { Pencil, Trash2 } from "lucide-react";
+import type {
+  Resource,
+  CheckAccessResult,
+  Grant,
+  AccessRequest,
+} from "../types";
 
 const ROLE_BADGE_STYLES: Record<string, string> = {
   admin: "bg-danger/15 text-danger",
@@ -38,36 +44,44 @@ const expiresLabel = (expiresAt: string) => {
 const ResourceDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const navigate = useNavigate();
+
   const [resource, setResource] = useState<Resource | null>(null);
   const [access, setAccess] = useState<CheckAccessResult | null>(null);
   const [grants, setGrants] = useState<Grant[]>([]);
+  const [myRequest, setMyRequest] = useState<AccessRequest | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshingAfterSubmit, setRefreshingAfterSubmit] = useState(false);
+
   const [showRequestModal, setShowRequestModal] = useState(false);
-  const [requestSubmitted, setRequestSubmitted] = useState(false);
-  const navigate = useNavigate();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [actingGrantId, setActingGrantId] = useState<string | null>(null);
 
-  const handleDelete = async () => {
-    setDeleteError("");
-    setDeleting(true);
-    try {
-      await deleteResource(resource!.id);
-      navigate("/resources");
-    } catch (err: any) {
-      setDeleteError(
-        err.response?.data?.message || "Failed to delete resource",
-      );
-      setDeleting(false);
-    }
-  };
-
   const isOwnerOrAdmin = resource
     ? resource.ownerId === user?.id || user?.role === "ADMIN"
     : false;
+  const isOwner = resource ? resource.ownerId === user?.id : false;
+
+  const refreshGrants = useCallback(async () => {
+    if (!id) return;
+    const grantsData = await fetchGrantsForResource(id);
+    setGrants(grantsData);
+  }, [id]);
+
+  const refreshAccess = useCallback(async () => {
+    if (!id) return;
+    const accessResult = await checkResourceAccess(id);
+    setAccess(accessResult);
+  }, [id]);
+
+  const refreshMyRequest = useCallback(async () => {
+    if (!id) return;
+    const request = await fetchMyRequestForResource(id).catch(() => null);
+    setMyRequest(request);
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -81,11 +95,15 @@ const ResourceDetailPage = () => {
         const accessResult = await checkResourceAccess(id);
         setAccess(accessResult);
 
-        const isOwner =
+        const owner =
           resourceData.ownerId === user?.id || user?.role === "ADMIN";
-        if (isOwner) {
+
+        if (owner) {
           const grantsData = await fetchGrantsForResource(id);
           setGrants(grantsData);
+        } else {
+          const request = await fetchMyRequestForResource(id).catch(() => null);
+          setMyRequest(request);
         }
       } finally {
         setLoading(false);
@@ -117,8 +135,38 @@ const ResourceDetailPage = () => {
     }
   };
 
-  const handleRequestAccessClick = async () => {
+  const handleDelete = async () => {
+    setDeleteError("");
+    setDeleting(true);
+    try {
+      await deleteResource(resource!.id);
+      navigate("/resources", {
+        state: { deletedResourceName: resource!.name },
+      });
+    } catch (err: any) {
+      setDeleteError(
+        err.response?.data?.message || "Failed to delete resource",
+      );
+      setDeleting(false);
+    }
+  };
+
+  const handleRequestAccessClick = () => {
     setShowRequestModal(true);
+  };
+
+  const handleRequestSubmitted = async () => {
+    setShowRequestModal(false);
+    setRefreshingAfterSubmit(true);
+    try {
+      await Promise.all([
+        refreshAccess(),
+        isOwnerOrAdmin ? refreshGrants() : Promise.resolve(),
+        refreshMyRequest(),
+      ]);
+    } finally {
+      setRefreshingAfterSubmit(false);
+    }
   };
 
   if (loading) {
@@ -138,11 +186,11 @@ const ResourceDetailPage = () => {
   }
 
   const roleKey = resource.requiredRole.name.toLowerCase();
-  const isOwner = resource.ownerId === user?.id;
+  const isRequestPending = myRequest?.status === "PENDING";
 
   return (
     <AppLayout>
-      <div className="max-w-5xl">
+      <div className="">
         <div className="flex items-center gap-1 text-xs font-mono text-on-dark-muted">
           <Link to="/resources" className="hover:text-on-dark transition">
             RESOURCES
@@ -175,44 +223,56 @@ const ResourceDetailPage = () => {
             </p>
           </div>
 
-          {isOwner ? (
-            <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            {isOwner && (
+              <>
+                <button
+                  onClick={() => setShowEditModal(true)}
+                  className="flex items-center gap-1.5 rounded-md border border-border-dark px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-on-dark hover:bg-bg transition"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Edit
+                </button>
+                <button
+                  onClick={() => setShowConfirmDeleteModal(true)}
+                  className="flex items-center gap-1.5 rounded-md border border-danger/30 px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-danger hover:bg-danger/10 transition"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete
+                </button>
+              </>
+            )}
+
+            {refreshingAfterSubmit ? (
+              <span className="flex items-center gap-2 rounded-md border border-border-dark bg-surface-raised px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-on-dark-muted">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Updating...
+              </span>
+            ) : isOwner ? (
               <button
-                onClick={() => setShowEditModal(true)}
-                className="flex items-center gap-1.5 rounded-md border border-border-dark px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-on-dark hover:bg-bg transition"
+                onClick={handleRequestAccessClick}
+                className="rounded-md bg-brand px-5 py-2.5 text-sm font-mono font-semibold uppercase tracking-wide text-white hover:bg-brand-hover transition shrink-0"
               >
-                <Pencil className="w-3.5 h-3.5" />
-                Edit
+                Request_Access
               </button>
+            ) : access?.hasAccess ? (
+              <span className="rounded-md border border-success/30 bg-success/10 px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-success">
+                Access Granted
+              </span>
+            ) : isRequestPending ? (
+              <span className="rounded-md border border-warning/30 bg-warning/10 px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-warning">
+                Pending Approval
+              </span>
+            ) : (
               <button
-                onClick={() => setShowConfirmDeleteModal(true)}
-                className="flex items-center gap-1.5 rounded-md border border-danger/30 px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-danger hover:bg-danger/10 transition"
+                onClick={handleRequestAccessClick}
+                className="rounded-md bg-brand px-5 py-2.5 text-sm font-mono font-semibold uppercase tracking-wide text-white hover:bg-brand-hover transition shrink-0"
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                Delete
+                Request_Access
               </button>
-            </div>
-          ) : !requestSubmitted ? (
-            <button
-              onClick={handleRequestAccessClick}
-              className="rounded-md bg-brand px-5 py-2.5 text-sm font-mono font-semibold uppercase tracking-wide text-white hover:bg-brand-hover transition shrink-0"
-            >
-              Request_Access
-            </button>
-          ) : (
-            <span className="rounded-md border border-success/30 bg-success/10 px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-success">
-              Request submitted
-            </span>
-          )}
-          {/* {requestSubmitted && (
-            <span className="rounded-md border border-success/30 bg-success/10 px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-success">
-              Request submitted
-            </span>
-          )} */}
+            )}
+          </div>
         </div>
-        {/* {deleteError && (
-          <p className="mt-2 text-xs text-danger font-mono">{deleteError}</p>
-        )} */}
 
         <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
           <div className="lg:col-span-2 space-y-4">
@@ -220,22 +280,30 @@ const ResourceDetailPage = () => {
               <p className="text-xs font-mono uppercase tracking-widest text-on-dark-muted mb-3">
                 Access_Trace
               </p>
-              <div
-                className={`flex items-start gap-2.5 rounded-md border px-3.5 py-3 text-sm ${
-                  access?.hasAccess
-                    ? "border-success/20 bg-success/10 text-success"
-                    : "border-border-dark bg-bg text-on-dark-muted"
-                }`}
-              >
-                {access?.hasAccess ? (
-                  <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
-                ) : (
-                  <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                )}
-                <span>
-                  {access?.reason ?? "You do not have access to this resource."}
-                </span>
-              </div>
+              {refreshingAfterSubmit ? (
+                <div className="flex items-center gap-2.5 rounded-md border border-border-dark bg-bg px-3.5 py-3 text-sm text-on-dark-muted">
+                  <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
+                  <span>Checking access...</span>
+                </div>
+              ) : (
+                <div
+                  className={`flex items-start gap-2.5 rounded-md border px-3.5 py-3 text-sm ${
+                    access?.hasAccess
+                      ? "border-success/20 bg-success/10 text-success"
+                      : "border-border-dark bg-bg text-on-dark-muted"
+                  }`}
+                >
+                  {access?.hasAccess ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                  ) : (
+                    <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  )}
+                  <span>
+                    {access?.reason ??
+                      "You do not have access to this resource."}
+                  </span>
+                </div>
+              )}
             </div>
 
             {isOwnerOrAdmin && (
@@ -278,8 +346,9 @@ const ResourceDetailPage = () => {
                           className="border-t border-border-dark"
                         >
                           <td className="px-5 py-3 text-on-dark">
-                            {grant.subjectType === "USER" ? "User" : "Group"}{" "}
-                            grant
+                            {grant.subjectType === "USER"
+                              ? (grant.user?.username ?? "Unknown user")
+                              : (grant.group?.name ?? "Unknown group")}
                           </td>
                           <td className="px-2 py-3">
                             <span
@@ -374,11 +443,9 @@ const ResourceDetailPage = () => {
       {showRequestModal && (
         <RequestAccessModal
           resource={resource}
+          isOwner={isOwner}
           onClose={() => setShowRequestModal(false)}
-          onSubmitted={() => {
-            setShowRequestModal(false);
-            setRequestSubmitted(true);
-          }}
+          onSubmitted={handleRequestSubmitted}
         />
       )}
       {showEditModal && resource && (

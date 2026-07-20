@@ -3,6 +3,8 @@ import prisma from "../config/prisma.js";
 const GRANT_INCLUDE = {
   resource: { include: { owner: { select: { id: true, username: true } } } },
   role: true,
+  user: { select: { id: true, username: true } },
+  group: { select: { id: true, name: true } },
 };
 
 const revokeGrant = async (req, res) => {
@@ -16,7 +18,7 @@ const revokeGrant = async (req, res) => {
       return res.status(404).json({ message: "Grant not found" });
     }
 
-    if (grant.status !== "ACTIVE") {
+    if (grant.status !== "ACTIVE" || grant.expiresAt <= new Date()) {
       return res
         .status(400)
         .json({ message: "This grant is not currently active" });

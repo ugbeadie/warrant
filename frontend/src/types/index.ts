@@ -63,6 +63,7 @@ export interface AccessRequest {
   resource: Resource;
   requestedRole: Role;
   approver: User | null;
+  grant?: Grant | null;
 }
 
 export interface Grant {
@@ -79,6 +80,8 @@ export interface Grant {
   lastAccessedAt: string | null;
   resource?: Resource;
   role?: Role;
+  user?: { id: string; username: string } | null;
+  group?: { id: string; name: string } | null;
 }
 
 export interface PolicyRule {

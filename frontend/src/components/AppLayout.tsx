@@ -1,3 +1,4 @@
+// AppLayout.tsx
 import { useState, type ReactNode } from "react";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
@@ -8,12 +9,15 @@ interface AppLayoutProps {
 
 export const AppLayout = ({ children }: AppLayoutProps) => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false); // desktop-only, lifted so it survives Sidebar remounts
 
   return (
     <div className="min-h-screen bg-bg flex">
       <Sidebar
         mobileOpen={mobileOpen}
         onMobileClose={() => setMobileOpen(false)}
+        collapsed={collapsed}
+        onToggleCollapsed={() => setCollapsed((prev) => !prev)}
       />
 
       <div className="flex-1 min-w-0">

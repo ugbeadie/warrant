@@ -32,17 +32,24 @@ const checkAccess = async (userId, resourceId) => {
     include: { role: true },
   });
 
-  if (directGrant && directGrant.role.rank >= resource.requiredRole.rank) {
-    await prisma.grant.update({
-      where: { id: directGrant.id },
-      data: { lastAccessedAt: now },
-    });
+  if (directGrant) {
+    if (directGrant.role.rank >= resource.requiredRole.rank) {
+      await prisma.grant.update({
+        where: { id: directGrant.id },
+        data: { lastAccessedAt: now },
+      });
+
+      return {
+        hasAccess: true,
+        reason: `Direct grant: you have "${directGrant.role.name}" access to this resource, expiring ${formatExpiry(directGrant.expiresAt)}.`,
+        source: "direct",
+        grant: directGrant,
+      };
+    }
 
     return {
-      hasAccess: true,
-      reason: `Direct grant: you have "${directGrant.role.name}" access to this resource, expiring ${formatExpiry(directGrant.expiresAt)}.`,
-      source: "direct",
-      grant: directGrant,
+      hasAccess: false,
+      reason: `You have a "${directGrant.role.name}" grant on this resource, but it does not meet the required "${resource.requiredRole.name}" level.`,
     };
   }
 
@@ -67,26 +74,32 @@ const checkAccess = async (userId, resourceId) => {
       include: { role: true },
     });
 
-    if (groupGrant && groupGrant.role.rank >= resource.requiredRole.rank) {
-      await prisma.grant.update({
-        where: { id: groupGrant.id },
-        data: { lastAccessedAt: now },
-      });
+    if (groupGrant) {
+      if (groupGrant.role.rank >= resource.requiredRole.rank) {
+        await prisma.grant.update({
+          where: { id: groupGrant.id },
+          data: { lastAccessedAt: now },
+        });
+
+        return {
+          hasAccess: true,
+          reason: `Group grant: you have access via membership in "${membership.group.name}", which has "${groupGrant.role.name}" access to this resource, expiring ${formatExpiry(groupGrant.expiresAt)}.`,
+          source: "group",
+          group: membership.group,
+          grant: groupGrant,
+        };
+      }
 
       return {
-        hasAccess: true,
-        reason: `Group grant: you have access via membership in "${membership.group.name}", which has "${groupGrant.role.name}" access to this resource, expiring ${formatExpiry(groupGrant.expiresAt)}.`,
-        source: "group",
-        group: membership.group,
-        grant: groupGrant,
+        hasAccess: false,
+        reason: `Your group "${membership.group.name}" has a "${groupGrant.role.name}" grant on this resource, but it does not meet the required "${resource.requiredRole.name}" level.`,
       };
     }
   }
 
   return {
     hasAccess: false,
-    reason:
-      "No active direct or group grant found for this resource at a sufficient role level.",
+    reason: "No active direct or group grant found for this resource.",
   };
 };
 

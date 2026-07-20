@@ -6,6 +6,13 @@ export const fetchPendingForOwner = async (): Promise<AccessRequest[]> => {
   return data.requests;
 };
 
+export const fetchMyRequestForResource = async (
+  resourceId: string,
+): Promise<AccessRequest | null> => {
+  const { data } = await api.get(`/requests/mine/${resourceId}`);
+  return data.request;
+};
+
 export const createAccessRequest = async (payload: {
   resourceId: string;
   requestedRoleName: string;

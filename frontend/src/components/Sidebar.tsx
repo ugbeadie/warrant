@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import {
   Shield,
@@ -27,11 +26,17 @@ const NAV_ITEMS = [
 interface SidebarProps {
   mobileOpen: boolean;
   onMobileClose: () => void;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
 }
 
-export const Sidebar = ({ mobileOpen, onMobileClose }: SidebarProps) => {
+export const Sidebar = ({
+  mobileOpen,
+  onMobileClose,
+  collapsed,
+  onToggleCollapsed,
+}: SidebarProps) => {
   const { user, logout } = useAuth();
-  const [collapsed, setCollapsed] = useState(false);
 
   const navItems =
     user?.role === "ADMIN"
@@ -70,7 +75,7 @@ export const Sidebar = ({ mobileOpen, onMobileClose }: SidebarProps) => {
             Warrant
           </span>
           <button
-            onClick={() => setCollapsed((prev) => !prev)}
+            onClick={onToggleCollapsed}
             className="hidden lg:flex h-6 w-6 items-center justify-center text-on-dark-muted cursor-pointer hover:text-on-dark transition"
           >
             {collapsed ? (

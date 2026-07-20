@@ -10,23 +10,31 @@ const REQUEST_INCLUDE = {
   },
   requestedRole: true,
   approver: { select: { id: true, username: true } },
+  grant: true,
 };
 
 const evaluateAutoApproval = async (
   resourceId,
   requestedRoleId,
   durationMinutes,
+  resourceRequiredRoleRank,
 ) => {
+  const requestedRole = await prisma.role.findUnique({
+    where: { id: requestedRoleId },
+  });
+
+  // Never auto-approve a role that doesn't even meet the resource's
+  // minimum required role — regardless of policy rules.
+  if (requestedRole.rank < resourceRequiredRoleRank) {
+    return null;
+  }
+
   const rules = await prisma.policyRule.findMany({
     where: { resourceId, autoApprove: true },
     include: { maxRole: true },
   });
 
   for (const rule of rules) {
-    const requestedRole = await prisma.role.findUnique({
-      where: { id: requestedRoleId },
-    });
-
     if (requestedRole.rank > rule.maxRole.rank) {
       continue;
     }
@@ -43,6 +51,39 @@ const evaluateAutoApproval = async (
   return null;
 };
 
+// A request "blocks" a new one if it's still pending, or if it was approved
+// and the resulting grant is still active (not expired/revoked).
+const findBlockingRequest = async (requesterId, resourceId) => {
+  const now = new Date();
+
+  const candidates = await prisma.accessRequest.findMany({
+    where: {
+      requesterId,
+      resourceId,
+      status: { in: ["PENDING", "APPROVED"] },
+    },
+    include: REQUEST_INCLUDE,
+    orderBy: { createdAt: "desc" },
+  });
+
+  for (const candidate of candidates) {
+    if (candidate.status === "PENDING") {
+      return candidate;
+    }
+
+    if (
+      candidate.status === "APPROVED" &&
+      candidate.grant &&
+      candidate.grant.status === "ACTIVE" &&
+      candidate.grant.expiresAt > now
+    ) {
+      return candidate;
+    }
+  }
+
+  return null;
+};
+
 const createAccessRequest = async (req, res) => {
   try {
     const { resourceId, requestedRoleName, reason, durationMinutes } = req.body;
@@ -53,6 +94,7 @@ const createAccessRequest = async (req, res) => {
 
     const resource = await prisma.resource.findUnique({
       where: { id: resourceId },
+      include: { requiredRole: true },
     });
 
     if (!resource) {
@@ -67,11 +109,31 @@ const createAccessRequest = async (req, res) => {
       return res.status(400).json({ message: "Invalid role name" });
     }
 
-    const matchingRule = await evaluateAutoApproval(
-      resourceId,
-      requestedRole.id,
-      durationMinutes,
-    );
+    const isOwnerRequest = resource.ownerId === req.user.id;
+
+    if (!isOwnerRequest) {
+      const blocking = await findBlockingRequest(req.user.id, resourceId);
+      if (blocking) {
+        return res.status(400).json({
+          message:
+            blocking.status === "PENDING"
+              ? "You already have a pending request for this resource"
+              : "You already have active access to this resource",
+          request: blocking,
+        });
+      }
+    }
+
+    const matchingRule = isOwnerRequest
+      ? null
+      : await evaluateAutoApproval(
+          resourceId,
+          requestedRole.id,
+          durationMinutes,
+          resource.requiredRole.rank,
+        );
+
+    const autoApprove = isOwnerRequest || !!matchingRule;
 
     const accessRequest = await prisma.accessRequest.create({
       data: {
@@ -80,15 +142,29 @@ const createAccessRequest = async (req, res) => {
         requestedRoleId: requestedRole.id,
         reason,
         durationMinutes,
-        status: matchingRule ? "APPROVED" : "PENDING",
-        decidedAt: matchingRule ? new Date() : null,
+        status: autoApprove ? "APPROVED" : "PENDING",
+        decidedAt: autoApprove ? new Date() : null,
+        approverId: isOwnerRequest ? req.user.id : undefined,
       },
       include: REQUEST_INCLUDE,
     });
 
     let grant = null;
 
-    if (matchingRule) {
+    if (isOwnerRequest) {
+      await prisma.auditLog.create({
+        data: {
+          actorId: req.user.id,
+          action: "OWNER_ACCESS_REQUEST_AUTO_APPROVED",
+          resourceId,
+          detail: {
+            requestId: accessRequest.id,
+            requestedRoleName,
+            durationMinutes,
+          },
+        },
+      });
+    } else if (matchingRule) {
       grant = await prisma.grant.create({
         data: {
           requestId: accessRequest.id,
@@ -115,12 +191,30 @@ const createAccessRequest = async (req, res) => {
     }
 
     res.status(201).json({
-      message: matchingRule
-        ? "Request auto-approved"
-        : "Request submitted for approval",
+      message: isOwnerRequest
+        ? "You own this resource — auto-approved"
+        : matchingRule
+          ? "Request auto-approved"
+          : "Request submitted for approval",
       request: accessRequest,
       grant,
     });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Returns the caller's most relevant (pending or still-active-approved)
+// request for a resource, or null. Used by the frontend to restore
+// correct button state on reload.
+const getMyRequestForResource = async (req, res) => {
+  try {
+    const { resourceId } = req.params;
+
+    const request = await findBlockingRequest(req.user.id, resourceId);
+
+    res.status(200).json({ request });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal server error" });
@@ -189,11 +283,9 @@ const decideRequest = async (req, res) => {
     const isAdmin = req.user.role === "ADMIN";
 
     if (!isOwner && !isAdmin) {
-      return res
-        .status(403)
-        .json({
-          message: "Only the resource owner or admin can decide this request",
-        });
+      return res.status(403).json({
+        message: "Only the resource owner or admin can decide this request",
+      });
     }
 
     const updatedRequest = await prisma.accessRequest.update({
@@ -223,13 +315,11 @@ const decideRequest = async (req, res) => {
       });
     }
 
-    res
-      .status(200)
-      .json({
-        message: `Request ${decision.toLowerCase()}`,
-        request: updatedRequest,
-        grant,
-      });
+    res.status(200).json({
+      message: `Request ${decision.toLowerCase()}`,
+      request: updatedRequest,
+      grant,
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal server error" });
@@ -238,6 +328,7 @@ const decideRequest = async (req, res) => {
 
 export {
   createAccessRequest,
+  getMyRequestForResource,
   getPendingRequestsForOwner,
   getAllPendingRequests,
   decideRequest,
