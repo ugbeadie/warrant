@@ -5,3 +5,17 @@ export const fetchPendingForOwner = async (): Promise<AccessRequest[]> => {
   const { data } = await api.get("/requests/pending");
   return data.requests;
 };
+
+export const createAccessRequest = async (payload: {
+  resourceId: string;
+  requestedRoleName: string;
+  reason: string;
+  durationMinutes: number;
+}): Promise<{
+  request: AccessRequest;
+  grant: unknown | null;
+  message: string;
+}> => {
+  const { data } = await api.post("/requests/create", payload);
+  return data;
+};

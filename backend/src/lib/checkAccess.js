@@ -1,5 +1,14 @@
 import prisma from "../config/prisma.js";
 
+const formatExpiry = (date) => {
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
 const checkAccess = async (userId, resourceId) => {
   const resource = await prisma.resource.findUnique({
     where: { id: resourceId },
@@ -31,7 +40,7 @@ const checkAccess = async (userId, resourceId) => {
 
     return {
       hasAccess: true,
-      reason: `Direct grant: you have "${directGrant.role.name}" access to this resource, expiring ${directGrant.expiresAt.toISOString()}.`,
+      reason: `Direct grant: you have "${directGrant.role.name}" access to this resource, expiring ${formatExpiry(directGrant.expiresAt)}.`,
       source: "direct",
       grant: directGrant,
     };
@@ -66,7 +75,7 @@ const checkAccess = async (userId, resourceId) => {
 
       return {
         hasAccess: true,
-        reason: `Group grant: you have access via membership in "${membership.group.name}", which has "${groupGrant.role.name}" access to this resource, expiring ${groupGrant.expiresAt.toISOString()}.`,
+        reason: `Group grant: you have access via membership in "${membership.group.name}", which has "${groupGrant.role.name}" access to this resource, expiring ${formatExpiry(groupGrant.expiresAt)}.`,
         source: "group",
         group: membership.group,
         grant: groupGrant,

@@ -109,11 +109,9 @@ const transferResourceOwnership = async (req, res) => {
     const isAdmin = req.user.role === "ADMIN";
 
     if (!isOwner && !isAdmin) {
-      return res
-        .status(403)
-        .json({
-          message: "Only the current owner or admin can transfer ownership",
-        });
+      return res.status(403).json({
+        message: "Only the current owner or admin can transfer ownership",
+      });
     }
 
     const newOwner = await prisma.user.findUnique({
@@ -130,12 +128,40 @@ const transferResourceOwnership = async (req, res) => {
       include: RESOURCE_INCLUDE,
     });
 
-    res
-      .status(200)
-      .json({
-        message: "Ownership transferred successfully",
-        resource: updatedResource,
-      });
+    res.status(200).json({
+      message: "Ownership transferred successfully",
+      resource: updatedResource,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const checkResourceAccess = async (req, res) => {
+  try {
+    const resource = await prisma.resource.findUnique({
+      where: { id: req.params.id },
+      include: { owner: true },
+    });
+
+    if (!resource) {
+      return res.status(404).json({ message: "Resource not found" });
+    }
+
+    const result = await checkAccess(req.user.id, req.params.id);
+
+    if (!result.hasAccess) {
+      return res
+        .status(403)
+        .json({ message: "Access denied", reason: result.reason });
+    }
+
+    res.status(200).json({
+      message: "Access granted",
+      reason: result.reason,
+      source: result.source,
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal server error" });
@@ -178,13 +204,102 @@ const attemptResourceAccess = async (req, res) => {
         .json({ message: "Access denied", reason: result.reason });
     }
 
+    res.status(200).json({
+      message: "Access granted",
+      reason: result.reason,
+      source: result.source,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const updateResource = async (req, res) => {
+  try {
+    const { name, requiredRoleName } = req.body;
+
+    const resource = await prisma.resource.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!resource) {
+      return res.status(404).json({ message: "Resource not found" });
+    }
+
+    if (resource.ownerId !== req.user.id) {
+      return res
+        .status(403)
+        .json({ message: "Only the owner can edit this resource" });
+    }
+
+    const data = {};
+
+    if (name) {
+      data.name = name;
+    }
+
+    if (requiredRoleName) {
+      const role = await prisma.role.findUnique({
+        where: { name: requiredRoleName },
+      });
+      if (!role) {
+        return res.status(400).json({ message: "Invalid role name" });
+      }
+      data.requiredRoleId = role.id;
+    }
+
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ message: "Nothing to update" });
+    }
+
+    const updatedResource = await prisma.resource.update({
+      where: { id: req.params.id },
+      data,
+      include: RESOURCE_INCLUDE,
+    });
+
     res
       .status(200)
       .json({
-        message: "Access granted",
-        reason: result.reason,
-        source: result.source,
+        message: "Resource updated successfully",
+        resource: updatedResource,
       });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const deleteResource = async (req, res) => {
+  try {
+    const resource = await prisma.resource.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!resource) {
+      return res.status(404).json({ message: "Resource not found" });
+    }
+
+    if (resource.ownerId !== req.user.id) {
+      return res
+        .status(403)
+        .json({ message: "Only the owner can delete this resource" });
+    }
+
+    const activeGrants = await prisma.grant.count({
+      where: { resourceId: req.params.id, status: "ACTIVE" },
+    });
+
+    if (activeGrants > 0) {
+      return res.status(400).json({
+        message: `Cannot delete this resource — it has ${activeGrants} active grant(s). Revoke them first.`,
+      });
+    }
+
+    await prisma.resource.delete({ where: { id: req.params.id } });
+
+    res.status(200).json({ message: "Resource deleted successfully" });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal server error" });
@@ -197,5 +312,8 @@ export {
   getMyResources,
   getResourceById,
   transferResourceOwnership,
+  checkResourceAccess,
   attemptResourceAccess,
+  updateResource,
+  deleteResource,
 };
