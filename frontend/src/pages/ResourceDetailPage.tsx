@@ -1,6 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ChevronRight, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import {
+  ChevronRight,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Loader2,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import {
   fetchResourceById,
   checkResourceAccess,
@@ -17,7 +25,7 @@ import { EditResourceModal } from "../components/EditResourceModal";
 import { ConfirmDeleteModal } from "../components/ConfirmDeleteModal";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { Pencil, Trash2 } from "lucide-react";
+// import { Pencil, Trash2 } from "lucide-react";
 import type {
   Resource,
   CheckAccessResult,
@@ -290,11 +298,15 @@ const ResourceDetailPage = () => {
                   className={`flex items-start gap-2.5 rounded-md border px-3.5 py-3 text-sm ${
                     access?.hasAccess
                       ? "border-success/20 bg-success/10 text-success"
-                      : "border-border-dark bg-bg text-on-dark-muted"
+                      : access?.insufficient
+                        ? "border-warning/20 bg-warning/10 text-warning"
+                        : "border-border-dark bg-bg text-on-dark-muted"
                   }`}
                 >
                   {access?.hasAccess ? (
                     <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                  ) : access?.insufficient ? (
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                   ) : (
                     <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   )}

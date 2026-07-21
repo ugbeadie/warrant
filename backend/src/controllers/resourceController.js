@@ -152,9 +152,11 @@ const checkResourceAccess = async (req, res) => {
     const result = await checkAccess(req.user.id, req.params.id);
 
     if (!result.hasAccess) {
-      return res
-        .status(403)
-        .json({ message: "Access denied", reason: result.reason });
+      return res.status(403).json({
+        message: "Access denied",
+        reason: result.reason,
+        insufficient: !!result.insufficient,
+      });
     }
 
     res.status(200).json({
@@ -259,12 +261,10 @@ const updateResource = async (req, res) => {
       include: RESOURCE_INCLUDE,
     });
 
-    res
-      .status(200)
-      .json({
-        message: "Resource updated successfully",
-        resource: updatedResource,
-      });
+    res.status(200).json({
+      message: "Resource updated successfully",
+      resource: updatedResource,
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal server error" });

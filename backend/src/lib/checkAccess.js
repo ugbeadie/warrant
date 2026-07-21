@@ -21,7 +21,7 @@ const checkAccess = async (userId, resourceId) => {
 
   const now = new Date();
 
-  const directGrant = await prisma.grant.findFirst({
+  const directGrants = await prisma.grant.findMany({
     where: {
       resourceId,
       subjectType: "USER",
@@ -30,26 +30,31 @@ const checkAccess = async (userId, resourceId) => {
       expiresAt: { gt: now },
     },
     include: { role: true },
+    orderBy: { role: { rank: "desc" } },
   });
 
-  if (directGrant) {
-    if (directGrant.role.rank >= resource.requiredRole.rank) {
+  if (directGrants.length > 0) {
+    const bestGrant = directGrants[0];
+
+    if (bestGrant.role.rank >= resource.requiredRole.rank) {
       await prisma.grant.update({
-        where: { id: directGrant.id },
+        where: { id: bestGrant.id },
         data: { lastAccessedAt: now },
       });
 
       return {
         hasAccess: true,
-        reason: `Direct grant: you have "${directGrant.role.name}" access to this resource, expiring ${formatExpiry(directGrant.expiresAt)}.`,
+        reason: `Direct grant: you have "${bestGrant.role.name}" access to this resource, expiring ${formatExpiry(bestGrant.expiresAt)}.`,
         source: "direct",
-        grant: directGrant,
+        grant: bestGrant,
       };
     }
 
     return {
       hasAccess: false,
-      reason: `You have a "${directGrant.role.name}" grant on this resource, but it does not meet the required "${resource.requiredRole.name}" level.`,
+      insufficient: true,
+      reason: `You have a "${bestGrant.role.name}" grant on this resource, but it does not meet the required "${resource.requiredRole.name}" level.`,
+      grant: bestGrant,
     };
   }
 
@@ -63,7 +68,7 @@ const checkAccess = async (userId, resourceId) => {
   });
 
   for (const membership of activeMemberships) {
-    const groupGrant = await prisma.grant.findFirst({
+    const groupGrants = await prisma.grant.findMany({
       where: {
         resourceId,
         subjectType: "GROUP",
@@ -72,27 +77,33 @@ const checkAccess = async (userId, resourceId) => {
         expiresAt: { gt: now },
       },
       include: { role: true },
+      orderBy: { role: { rank: "desc" } },
     });
 
-    if (groupGrant) {
-      if (groupGrant.role.rank >= resource.requiredRole.rank) {
+    if (groupGrants.length > 0) {
+      const bestGroupGrant = groupGrants[0];
+
+      if (bestGroupGrant.role.rank >= resource.requiredRole.rank) {
         await prisma.grant.update({
-          where: { id: groupGrant.id },
+          where: { id: bestGroupGrant.id },
           data: { lastAccessedAt: now },
         });
 
         return {
           hasAccess: true,
-          reason: `Group grant: you have access via membership in "${membership.group.name}", which has "${groupGrant.role.name}" access to this resource, expiring ${formatExpiry(groupGrant.expiresAt)}.`,
+          reason: `Group grant: you have access via membership in "${membership.group.name}", which has "${bestGroupGrant.role.name}" access to this resource, expiring ${formatExpiry(bestGroupGrant.expiresAt)}.`,
           source: "group",
           group: membership.group,
-          grant: groupGrant,
+          grant: bestGroupGrant,
         };
       }
 
       return {
         hasAccess: false,
-        reason: `Your group "${membership.group.name}" has a "${groupGrant.role.name}" grant on this resource, but it does not meet the required "${resource.requiredRole.name}" level.`,
+        insufficient: true,
+        reason: `Your group "${membership.group.name}" has a "${bestGroupGrant.role.name}" grant on this resource, but it does not meet the required "${resource.requiredRole.name}" level.`,
+        group: membership.group,
+        grant: bestGroupGrant,
       };
     }
   }

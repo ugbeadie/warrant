@@ -53,8 +53,19 @@ const evaluateAutoApproval = async (
 
 // A request "blocks" a new one if it's still pending, or if it was approved
 // and the resulting grant is still active (not expired/revoked).
-const findBlockingRequest = async (requesterId, resourceId) => {
+const findBlockingRequest = async (
+  requesterId,
+  resourceId,
+  requestedRoleId,
+) => {
   const now = new Date();
+
+  const resource = await prisma.resource.findUnique({
+    where: { id: resourceId },
+    include: { requiredRole: true },
+  });
+
+  if (!resource) return null;
 
   const candidates = await prisma.accessRequest.findMany({
     where: {
@@ -77,7 +88,18 @@ const findBlockingRequest = async (requesterId, resourceId) => {
       candidate.grant.status === "ACTIVE" &&
       candidate.grant.expiresAt > now
     ) {
-      return candidate;
+      const grantRole = await prisma.role.findUnique({
+        where: { id: candidate.grant.roleId },
+      });
+
+      if (!grantRole) continue;
+
+      const isSufficient = grantRole.rank >= resource.requiredRole.rank;
+      const isSameRoleBeingRequested = grantRole.id === requestedRoleId;
+
+      if (isSufficient || isSameRoleBeingRequested) {
+        return candidate;
+      }
     }
   }
 
@@ -112,7 +134,11 @@ const createAccessRequest = async (req, res) => {
     const isOwnerRequest = resource.ownerId === req.user.id;
 
     if (!isOwnerRequest) {
-      const blocking = await findBlockingRequest(req.user.id, resourceId);
+      const blocking = await findBlockingRequest(
+        req.user.id,
+        resourceId,
+        requestedRole.id,
+      );
       if (blocking) {
         return res.status(400).json({
           message:
@@ -175,6 +201,13 @@ const createAccessRequest = async (req, res) => {
           expiresAt: new Date(Date.now() + durationMinutes * 60 * 1000),
         },
       });
+
+      await supersedeLowerGrants(
+        req.user.id,
+        resourceId,
+        requestedRole.id,
+        grant.id,
+      );
     } else {
       const resourceWithOwner = await prisma.resource.findUnique({
         where: { id: resourceId },
@@ -202,6 +235,51 @@ const createAccessRequest = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const supersedeLowerGrants = async (
+  userId,
+  resourceId,
+  newGrantRoleId,
+  newGrantId,
+) => {
+  const newRole = await prisma.role.findUnique({
+    where: { id: newGrantRoleId },
+  });
+
+  const lowerGrants = await prisma.grant.findMany({
+    where: {
+      resourceId,
+      subjectType: "USER",
+      userId,
+      status: "ACTIVE",
+      id: { not: newGrantId },
+    },
+    include: { role: true },
+  });
+
+  for (const grant of lowerGrants) {
+    if (grant.role.rank <= newRole.rank) {
+      await prisma.grant.update({
+        where: { id: grant.id },
+        data: { status: "REVOKED" },
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          actorId: userId,
+          action: "GRANT_SUPERSEDED",
+          resourceId,
+          detail: {
+            revokedGrantId: grant.id,
+            revokedRole: grant.role.name,
+            newGrantId,
+            newRole: newRole.name,
+          },
+        },
+      });
+    }
   }
 };
 
@@ -313,6 +391,13 @@ const decideRequest = async (req, res) => {
           ),
         },
       });
+
+      await supersedeLowerGrants(
+        accessRequest.requesterId,
+        accessRequest.resourceId,
+        accessRequest.requestedRoleId,
+        grant.id,
+      );
     }
 
     res.status(200).json({
@@ -328,6 +413,7 @@ const decideRequest = async (req, res) => {
 
 export {
   createAccessRequest,
+  supersedeLowerGrants,
   getMyRequestForResource,
   getPendingRequestsForOwner,
   getAllPendingRequests,

@@ -105,6 +105,7 @@ export interface Notification {
 
 export interface CheckAccessResult {
   hasAccess: boolean;
+  insufficient?: boolean;
   reason: string;
   source?: "direct" | "group";
   group?: Group;

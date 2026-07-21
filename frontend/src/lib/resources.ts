@@ -36,6 +36,7 @@ export const checkResourceAccess = async (
   } catch (err: any) {
     return {
       hasAccess: false,
+      insufficient: !!err.response?.data?.insufficient,
       reason: err.response?.data?.reason ?? "Access denied.",
     };
   }
