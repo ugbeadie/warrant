@@ -4,6 +4,15 @@ import { createResource } from "../lib/resources";
 import { createPolicyRule } from "../lib/policy";
 import type { Resource } from "../types";
 
+const ROLE_ORDER = [
+  { name: "viewer", rank: 1 },
+  { name: "editor", rank: 2 },
+  { name: "admin", rank: 3 },
+];
+
+const rankOf = (name: string) =>
+  ROLE_ORDER.find((r) => r.name === name)?.rank ?? 0;
+
 interface CreateResourceModalProps {
   onClose: () => void;
   onCreated: (resource: Resource) => void;
@@ -18,10 +27,22 @@ export const CreateResourceModal = ({
 
   const [addRule, setAddRule] = useState(false);
   const [ruleMaxRoleName, setRuleMaxRoleName] = useState("viewer");
-  const [ruleMaxDuration, setRuleMaxDuration] = useState("");
+  const [ruleMaxDuration, setRuleMaxDuration] = useState("1440");
 
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+
+  const eligibleMaxRoles = ROLE_ORDER.filter(
+    (r) => r.rank >= rankOf(requiredRoleName),
+  );
+
+  const handleRequiredRoleChange = (value: string) => {
+    setRequiredRoleName(value);
+    // Keep the auto-approve ceiling from falling below the new floor.
+    if (rankOf(ruleMaxRoleName) < rankOf(value)) {
+      setRuleMaxRoleName(value);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,7 +123,7 @@ export const CreateResourceModal = ({
             </label>
             <select
               value={requiredRoleName}
-              onChange={(e) => setRequiredRoleName(e.target.value)}
+              onChange={(e) => handleRequiredRoleChange(e.target.value)}
               className="w-full rounded-md border border-border-dark bg-bg px-3 py-2.5 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             >
               <option value="viewer">Viewer</option>
@@ -133,10 +154,16 @@ export const CreateResourceModal = ({
                     onChange={(e) => setRuleMaxRoleName(e.target.value)}
                     className="w-full rounded-md border border-border-dark bg-surface-raised px-3 py-2 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                   >
-                    <option value="viewer">Viewer</option>
-                    <option value="editor">Editor</option>
-                    <option value="admin">Admin</option>
+                    {eligibleMaxRoles.map((r) => (
+                      <option key={r.name} value={r.name}>
+                        {r.name[0].toUpperCase() + r.name.slice(1)}
+                      </option>
+                    ))}
                   </select>
+                  <p className="mt-1 text-[10px] text-on-dark-muted">
+                    Must be at or above the required role. Requests at or below
+                    this role and duration will be auto-approved.
+                  </p>
                 </div>
                 <div>
                   <label className="block text-[11px] font-mono uppercase tracking-widest text-on-dark-muted mb-1.5">
@@ -155,10 +182,6 @@ export const CreateResourceModal = ({
                     placeholder="e.g. 60"
                     className="w-full rounded-md border border-border-dark bg-surface-raised px-3 py-2 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                   />
-                  <p className="mt-1 text-[10px] text-on-dark-muted">
-                    Requests at or below this role and duration will be
-                    auto-approved.
-                  </p>
                 </div>
               </div>
             )}
