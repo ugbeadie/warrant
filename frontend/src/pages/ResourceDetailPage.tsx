@@ -261,7 +261,7 @@ const ResourceDetailPage = () => {
                 onClick={handleRequestAccessClick}
                 className="rounded-md bg-brand px-5 py-2.5 text-sm font-mono font-semibold uppercase tracking-wide text-white hover:bg-brand-hover transition shrink-0"
               >
-                Request_Access
+                Log_Access_Session
               </button>
             ) : access?.hasAccess ? (
               <span className="rounded-md border border-success/30 bg-success/10 px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-success">

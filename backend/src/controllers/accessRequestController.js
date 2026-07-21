@@ -23,8 +23,6 @@ const evaluateAutoApproval = async (
     where: { id: requestedRoleId },
   });
 
-  // Never auto-approve a role that doesn't even meet the resource's
-  // minimum required role — regardless of policy rules.
   if (requestedRole.rank < resourceRequiredRoleRank) {
     return null;
   }
@@ -51,8 +49,6 @@ const evaluateAutoApproval = async (
   return null;
 };
 
-// A request "blocks" a new one if it's still pending, or if it was approved
-// and the resulting grant is still active (not expired/revoked).
 const findBlockingRequest = async (
   requesterId,
   resourceId,
@@ -104,6 +100,51 @@ const findBlockingRequest = async (
   }
 
   return null;
+};
+
+const supersedeLowerGrants = async (
+  userId,
+  resourceId,
+  newGrantRoleId,
+  newGrantId,
+) => {
+  const newRole = await prisma.role.findUnique({
+    where: { id: newGrantRoleId },
+  });
+
+  const lowerGrants = await prisma.grant.findMany({
+    where: {
+      resourceId,
+      subjectType: "USER",
+      userId,
+      status: "ACTIVE",
+      id: { not: newGrantId },
+    },
+    include: { role: true },
+  });
+
+  for (const grant of lowerGrants) {
+    if (grant.role.rank <= newRole.rank) {
+      await prisma.grant.update({
+        where: { id: grant.id },
+        data: { status: "REVOKED" },
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          actorId: userId,
+          action: "GRANT_SUPERSEDED",
+          resourceId,
+          detail: {
+            revokedGrantId: grant.id,
+            revokedRole: grant.role.name,
+            newGrantId,
+            newRole: newRole.name,
+          },
+        },
+      });
+    }
+  }
 };
 
 const createAccessRequest = async (req, res) => {
@@ -178,6 +219,24 @@ const createAccessRequest = async (req, res) => {
     let grant = null;
 
     if (isOwnerRequest) {
+      grant = await prisma.grant.create({
+        data: {
+          requestId: accessRequest.id,
+          subjectType: "USER",
+          userId: req.user.id,
+          resourceId,
+          roleId: requestedRole.id,
+          expiresAt: new Date(Date.now() + durationMinutes * 60 * 1000),
+        },
+      });
+
+      await supersedeLowerGrants(
+        req.user.id,
+        resourceId,
+        requestedRole.id,
+        grant.id,
+      );
+
       await prisma.auditLog.create({
         data: {
           actorId: req.user.id,
@@ -187,6 +246,7 @@ const createAccessRequest = async (req, res) => {
             requestId: accessRequest.id,
             requestedRoleName,
             durationMinutes,
+            grantId: grant.id,
           },
         },
       });
@@ -225,7 +285,7 @@ const createAccessRequest = async (req, res) => {
 
     res.status(201).json({
       message: isOwnerRequest
-        ? "You own this resource — auto-approved"
+        ? "You own this resource — logged"
         : matchingRule
           ? "Request auto-approved"
           : "Request submitted for approval",
@@ -238,54 +298,6 @@ const createAccessRequest = async (req, res) => {
   }
 };
 
-const supersedeLowerGrants = async (
-  userId,
-  resourceId,
-  newGrantRoleId,
-  newGrantId,
-) => {
-  const newRole = await prisma.role.findUnique({
-    where: { id: newGrantRoleId },
-  });
-
-  const lowerGrants = await prisma.grant.findMany({
-    where: {
-      resourceId,
-      subjectType: "USER",
-      userId,
-      status: "ACTIVE",
-      id: { not: newGrantId },
-    },
-    include: { role: true },
-  });
-
-  for (const grant of lowerGrants) {
-    if (grant.role.rank <= newRole.rank) {
-      await prisma.grant.update({
-        where: { id: grant.id },
-        data: { status: "REVOKED" },
-      });
-
-      await prisma.auditLog.create({
-        data: {
-          actorId: userId,
-          action: "GRANT_SUPERSEDED",
-          resourceId,
-          detail: {
-            revokedGrantId: grant.id,
-            revokedRole: grant.role.name,
-            newGrantId,
-            newRole: newRole.name,
-          },
-        },
-      });
-    }
-  }
-};
-
-// Returns the caller's most relevant (pending or still-active-approved)
-// request for a resource, or null. Used by the frontend to restore
-// correct button state on reload.
 const getMyRequestForResource = async (req, res) => {
   try {
     const { resourceId } = req.params;
@@ -361,9 +373,17 @@ const decideRequest = async (req, res) => {
     const isAdmin = req.user.role === "ADMIN";
 
     if (!isOwner && !isAdmin) {
-      return res.status(403).json({
-        message: "Only the resource owner or admin can decide this request",
-      });
+      return res
+        .status(403)
+        .json({
+          message: "Only the resource owner or admin can decide this request",
+        });
+    }
+
+    if (accessRequest.requesterId === req.user.id) {
+      return res
+        .status(403)
+        .json({ message: "You cannot approve or deny your own request" });
     }
 
     const updatedRequest = await prisma.accessRequest.update({
