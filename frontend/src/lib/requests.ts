@@ -1,4 +1,4 @@
-import api from "../api/axios";
+import api from "./axios";
 import type { AccessRequest } from "../types";
 
 export const fetchPendingForOwner = async (): Promise<AccessRequest[]> => {

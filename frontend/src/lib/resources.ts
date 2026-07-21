@@ -1,4 +1,4 @@
-import api from "../api/axios";
+import api from "./axios";
 import type { Resource, CheckAccessResult, Grant, PolicyRule } from "../types";
 
 export const fetchMyResources = async (): Promise<Resource[]> => {

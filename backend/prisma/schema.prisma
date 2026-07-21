@@ -146,7 +146,7 @@ model AccessRequest {
 
 model PolicyRule {
   id          String   @id @default(uuid())
-  resource    Resource @relation(fields: [resourceId], references: [id])
+  resource    Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
   resourceId  String
   condition   Json
   autoApprove Boolean  @default(false)

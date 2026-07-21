@@ -1,13 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Database } from "lucide-react";
-import {
-  fetchMyResources,
-  fetchAllResources,
-  createResource,
-} from "../lib/resources";
+import { Database } from "lucide-react";
+import { fetchMyResources, fetchAllResources } from "../lib/resources";
 import { AppLayout } from "../components/AppLayout";
 import { ResourceCardSkeleton } from "../components/ResourceCardSkeleton";
+import { CreateResourceModal } from "../components/createResourceModal";
 import type { Resource } from "../types";
 import { useAuth } from "../context/AuthContext";
 
@@ -24,10 +21,6 @@ const ResourcesPage = () => {
   const [scope, setScope] = useState<"mine" | "all">("all");
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
-  const [name, setName] = useState("");
-  const [requiredRoleName, setRequiredRoleName] = useState("viewer");
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState("");
 
   useEffect(() => {
     const load = async () => {
@@ -46,24 +39,8 @@ const ResourcesPage = () => {
     load();
   }, [scope]);
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCreateError("");
-    setCreating(true);
-    try {
-      const resource = await createResource(name, requiredRoleName);
-      setResources((prev) =>
-        scope === "mine" || scope === "all" ? [resource, ...prev] : prev,
-      );
-      setName("");
-      setShowCreate(false);
-    } catch (err: any) {
-      setCreateError(
-        err.response?.data?.message || "Failed to create resource",
-      );
-    } finally {
-      setCreating(false);
-    }
+  const handleCreated = (resource: Resource) => {
+    setResources((prev) => [resource, ...prev]);
   };
 
   const filteredResources = resources.filter((r) =>
@@ -87,14 +64,14 @@ const ResourcesPage = () => {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Filter resources..."
+              placeholder="Search Resources..."
               className="rounded-md border border-border-dark bg-surface-raised px-3.5 py-2 text-sm text-on-dark font-mono placeholder:text-on-dark-muted outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
             <button
-              onClick={() => setShowCreate((prev) => !prev)}
+              onClick={() => setShowCreate(true)}
               className="flex items-center gap-2 font-mono uppercase rounded-md bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-hover transition shrink-0"
             >
-              New
+              New_Resource
             </button>
           </div>
         </div>
@@ -123,39 +100,10 @@ const ResourcesPage = () => {
         </div>
 
         {showCreate && (
-          <form
-            onSubmit={handleCreate}
-            className="mt-6 rounded-xl border border-border-dark bg-surface-raised p-6 flex flex-col sm:flex-row gap-3"
-          >
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Resource name"
-              required
-              autoFocus
-              className="flex-1 rounded-md border border-border-dark bg-bg px-3.5 py-2.5 text-sm text-on-dark font-mono placeholder:text-on-dark-muted outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
-            />
-            <select
-              value={requiredRoleName}
-              onChange={(e) => setRequiredRoleName(e.target.value)}
-              className="rounded-md border border-border-dark bg-bg px-3.5 py-2.5 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
-            >
-              <option value="viewer">Viewer</option>
-              <option value="editor">Editor</option>
-              <option value="admin">Admin</option>
-            </select>
-            <button
-              type="submit"
-              disabled={creating}
-              className="rounded-md bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-hover disabled:opacity-50 transition"
-            >
-              {creating ? "Creating..." : "Create"}
-            </button>
-          </form>
-        )}
-        {createError && (
-          <p className="mt-2 text-xs text-danger font-mono">{createError}</p>
+          <CreateResourceModal
+            onClose={() => setShowCreate(false)}
+            onCreated={handleCreated}
+          />
         )}
 
         <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

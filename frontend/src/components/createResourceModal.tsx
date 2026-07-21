@@ -1,94 +1,67 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { X } from "lucide-react";
-import { updateResource, fetchPolicyRulesForResource } from "../lib/resources";
-import {
-  createPolicyRule,
-  updatePolicyRule,
-  deletePolicyRule,
-} from "../lib/policy";
-import type { PolicyRule, Resource } from "../types";
+import { createResource } from "../lib/resources";
+import { createPolicyRule } from "../lib/policy";
+import type { Resource } from "../types";
 
-interface EditResourceModalProps {
-  resource: Resource;
+interface CreateResourceModalProps {
   onClose: () => void;
-  onUpdated: (resource: Resource) => void;
+  onCreated: (resource: Resource) => void;
 }
 
-export const EditResourceModal = ({
-  resource,
+export const CreateResourceModal = ({
   onClose,
-  onUpdated,
-}: EditResourceModalProps) => {
-  const [name, setName] = useState(resource.name);
-  const [requiredRoleName, setRequiredRoleName] = useState(
-    resource.requiredRole.name.toLowerCase(),
-  );
+  onCreated,
+}: CreateResourceModalProps) => {
+  const [name, setName] = useState("");
+  const [requiredRoleName, setRequiredRoleName] = useState("viewer");
 
   const [addRule, setAddRule] = useState(false);
   const [ruleMaxRoleName, setRuleMaxRoleName] = useState("viewer");
-  const [ruleMaxDuration, setRuleMaxDuration] = useState("1440");
+  const [ruleMaxDuration, setRuleMaxDuration] = useState("");
 
-  const [existingRule, setExistingRule] = useState<PolicyRule | null>(null);
-  const [rulesLoading, setRulesLoading] = useState(true);
-
-  const [saving, setSaving] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    fetchPolicyRulesForResource(resource.id)
-      .then((rules) => {
-        const rule = rules[0] ?? null;
-        setExistingRule(rule);
-        if (rule) {
-          setAddRule(rule.autoApprove);
-          setRuleMaxRoleName(rule.maxRole.name.toLowerCase());
-          setRuleMaxDuration(String(rule.condition.maxDuration ?? ""));
-        }
-      })
-      .catch(() => setError("Failed to load policy rules"))
-      .finally(() => setRulesLoading(false));
-  }, [resource.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setSaving(true);
-    try {
-      const updated = await updateResource(resource.id, {
-        name,
-        requiredRoleName,
-      });
 
-      const durationNum = Number(ruleMaxDuration);
+    if (addRule && ruleMaxDuration === "") {
+      setError("Enter a max duration for the policy rule");
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const resource = await createResource(name, requiredRoleName);
 
       if (addRule) {
-        if (existingRule) {
-          const updatedRule = await updatePolicyRule(existingRule.id, {
-            autoApprove: true,
-            maxRoleName: ruleMaxRoleName,
-            condition: { maxDuration: durationNum },
-          });
-          setExistingRule(updatedRule);
-        } else {
-          const newRule = await createPolicyRule({
+        try {
+          await createPolicyRule({
             resourceId: resource.id,
             autoApprove: true,
             maxRoleName: ruleMaxRoleName,
-            condition: { maxDuration: durationNum },
+            condition: { maxDuration: Number(ruleMaxDuration) },
           });
-          setExistingRule(newRule);
+        } catch (ruleErr: any) {
+          onCreated(resource);
+          setCreating(false);
+          setError(
+            `Resource created, but the policy rule failed to save: ${
+              ruleErr.response?.data?.message || "unknown error"
+            }. You can add it from Edit.`,
+          );
+          return;
         }
-      } else if (existingRule) {
-        await deletePolicyRule(existingRule.id);
-        setExistingRule(null);
       }
 
-      onUpdated(updated);
+      onCreated(resource);
       onClose();
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to update resource");
+      setError(err.response?.data?.message || "Failed to create resource");
     } finally {
-      setSaving(false);
+      setCreating(false);
     }
   };
 
@@ -97,7 +70,7 @@ export const EditResourceModal = ({
       <div className="w-full max-w-md rounded-xl border border-border-dark bg-surface-raised">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-dark">
           <p className="text-sm font-mono font-semibold uppercase tracking-widest text-on-dark">
-            Edit_Resource
+            Create_Resource
           </p>
           <button
             onClick={onClose}
@@ -118,6 +91,7 @@ export const EditResourceModal = ({
               onChange={(e) => setName(e.target.value)}
               required
               autoFocus
+              placeholder="Resource name"
               className="w-full rounded-md border border-border-dark bg-bg px-3 py-2.5 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
           </div>
@@ -142,7 +116,6 @@ export const EditResourceModal = ({
               <input
                 type="checkbox"
                 checked={addRule}
-                disabled={rulesLoading}
                 onChange={(e) => setAddRule(e.target.checked)}
                 className="accent-brand"
               />
@@ -203,10 +176,10 @@ export const EditResourceModal = ({
             </button>
             <button
               type="submit"
-              disabled={saving || rulesLoading}
+              disabled={creating}
               className="rounded-md bg-brand px-5 py-2 text-xs font-mono font-semibold uppercase tracking-wide text-white hover:bg-brand-hover disabled:opacity-50 transition"
             >
-              {saving ? "Saving..." : "Save_Changes"}
+              {creating ? "Creating..." : "Create_Resource"}
             </button>
           </div>
         </form>

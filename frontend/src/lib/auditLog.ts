@@ -1,4 +1,4 @@
-import api from "../api/axios";
+import api from "./axios";
 import type { AuditLogEntry } from "../types";
 
 export const fetchMyAuditLog = async (

@@ -14,7 +14,7 @@ export const Topbar = ({ onMenuClick }: TopbarProps) => {
         >
           ☰
         </button>
-
+        {/* //TODO:REMOVE SEARCH BAR AND PLACE BELL TO RIGHT */}
         <div className="flex-1 max-w-md">
           <div className="relative w-full">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-sm">
@@ -27,7 +27,6 @@ export const Topbar = ({ onMenuClick }: TopbarProps) => {
             />
           </div>
         </div>
-
         <NotificationBell />
       </div>
     </header>

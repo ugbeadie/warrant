@@ -5,7 +5,7 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
-import api from "../api/axios";
+import api from "../lib/axios";
 import type { User } from "../types";
 
 interface AuthContextType {
