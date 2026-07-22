@@ -319,7 +319,7 @@ const getPendingRequestsForOwner = async (req, res) => {
         resource: { ownerId: req.user.id },
       },
       include: REQUEST_INCLUDE,
-      orderBy: { createdAt: "asc" },
+      orderBy: { createdAt: "desc" },
     });
 
     res.status(200).json({ requests });
@@ -334,7 +334,7 @@ const getAllPendingRequests = async (req, res) => {
     const requests = await prisma.accessRequest.findMany({
       where: { status: "PENDING" },
       include: REQUEST_INCLUDE,
-      orderBy: { createdAt: "asc" },
+      orderBy: { createdAt: "desc" },
     });
 
     res.status(200).json({ requests });
@@ -373,11 +373,9 @@ const decideRequest = async (req, res) => {
     const isAdmin = req.user.role === "ADMIN";
 
     if (!isOwner && !isAdmin) {
-      return res
-        .status(403)
-        .json({
-          message: "Only the resource owner or admin can decide this request",
-        });
+      return res.status(403).json({
+        message: "Only the resource owner or admin can decide this request",
+      });
     }
 
     if (accessRequest.requesterId === req.user.id) {

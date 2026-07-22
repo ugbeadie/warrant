@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "GrantStatus" ADD VALUE 'SURRENDERED';

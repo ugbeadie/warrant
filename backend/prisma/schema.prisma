@@ -23,6 +23,7 @@ enum GrantStatus {
   ACTIVE
   EXPIRED
   REVOKED
+  SURRENDERED
 }
 
 enum MembershipStatus {

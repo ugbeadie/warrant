@@ -18,7 +18,6 @@ const ROLE_BADGE_STYLES: Record<string, string> = {
   viewer: "bg-neutral/15 text-neutral",
 };
 
-// Add the rank mapping logic here so we can compute insufficiency
 const ROLE_ORDER = [
   { name: "viewer", rank: 1 },
   { name: "editor", rank: 2 },
@@ -84,7 +83,6 @@ const ApprovalsPage = () => {
 
   const handleApproveClick = (req: AccessRequest, isInsufficient: boolean) => {
     if (isInsufficient && confirmingId !== req.id) {
-      // First click on an insufficient request just arms confirmation
       setConfirmingId(req.id);
       return;
     }
@@ -144,121 +142,128 @@ const ApprovalsPage = () => {
               No pending requests.
             </p>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-[10px] font-mono uppercase tracking-widest text-on-dark-muted border-b border-border-dark">
-                  <th className="text-left font-medium px-5 py-3">Requester</th>
-                  <th className="text-left font-medium px-2 py-3">Resource</th>
-                  <th className="text-left font-medium px-2 py-3">Reason</th>
-                  <th className="text-right font-medium px-5 py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {requests.map((req) => {
-                  const roleKey = req.requestedRole.name.toLowerCase();
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-sm">
+                <thead>
+                  <tr className="text-[10px] font-mono uppercase tracking-widest text-on-dark-muted border-b border-border-dark">
+                    <th className="text-left font-medium px-5 py-3">
+                      Requester
+                    </th>
+                    <th className="text-left font-medium px-2 py-3">
+                      Resource
+                    </th>
+                    <th className="text-left font-medium px-2 py-3">Reason</th>
+                    <th className="text-right font-medium px-5 py-3">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requests.map((req) => {
+                    const roleKey = req.requestedRole.name.toLowerCase();
 
-                  // Compute if the request is insufficient based on ranks
-                  const isInsufficient =
-                    rankOf(req.requestedRole.name) <
-                    rankOf(req.resource.requiredRole.name);
+                    const isInsufficient =
+                      rankOf(req.requestedRole.name) <
+                      rankOf(req.resource.requiredRole.name);
 
-                  const isActing = decidingId === req.id;
-                  const isConfirming = confirmingId === req.id;
+                    const isActing = decidingId === req.id;
+                    const isConfirming = confirmingId === req.id;
 
-                  return (
-                    <tr
-                      key={req.id}
-                      className={`border-b border-border-dark last:border-0 ${
-                        isInsufficient ? "bg-warning/5" : ""
-                      }`}
-                    >
-                      <td className="px-5 py-4 align-top">
-                        <p className="text-sm font-medium text-on-dark">
-                          {req.requester.username}
-                        </p>
-                        <p className="mt-0.5 text-xs text-on-dark-muted font-mono">
-                          {timeAgo(req.createdAt)}
-                        </p>
-                      </td>
-                      <td className="px-2 py-4 align-top">
-                        <Link
-                          to={`/resources/${req.resource.id}`}
-                          className="text-sm font-medium text-on-dark hover:text-brand transition"
-                        >
-                          {req.resource.name}
-                        </Link>
-                        <div className="mt-1 flex items-center gap-1.5">
-                          <span
-                            className={`rounded px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wide ${
-                              ROLE_BADGE_STYLES[roleKey] ??
-                              "bg-neutral/15 text-neutral"
-                            }`}
+                    return (
+                      <tr
+                        key={req.id}
+                        className={`border-b border-border-dark last:border-0 ${
+                          isInsufficient ? "bg-warning/5" : ""
+                        }`}
+                      >
+                        <td className="px-5 py-4 align-top whitespace-nowrap">
+                          <p className="text-sm font-medium text-on-dark">
+                            {req.requester.username}
+                          </p>
+                          <p className="mt-0.5 text-xs text-on-dark-muted font-mono">
+                            {timeAgo(req.createdAt)}
+                          </p>
+                        </td>
+                        <td className="px-2 py-4 align-top">
+                          <Link
+                            to={`/resources/${req.resource.id}`}
+                            className="text-sm font-medium text-on-dark hover:text-brand transition whitespace-nowrap"
                           >
-                            {req.requestedRole.name}
-                          </span>
-                          <span className="text-xs text-on-dark-muted">
-                            · {durationLabel(req.durationMinutes)}
-                          </span>
-                        </div>
-                        {isInsufficient && (
-                          <div className="mt-1.5 flex items-start gap-1 text-[10px] text-warning">
-                            <AlertTriangle className="w-3 h-3 shrink-0 relative top-px" />
-                            <span>
-                              Requires at least{" "}
-                              <span className="font-semibold">
-                                {req.resource.requiredRole.name}
-                              </span>{" "}
-                              — this grant won't actually meet that level.
+                            {req.resource.name}
+                          </Link>
+                          <div className="mt-1 flex items-center gap-1.5 whitespace-nowrap">
+                            <span
+                              className={`rounded px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wide ${
+                                ROLE_BADGE_STYLES[roleKey] ??
+                                "bg-neutral/15 text-neutral"
+                              }`}
+                            >
+                              {req.requestedRole.name}
+                            </span>
+                            <span className="text-xs text-on-dark-muted">
+                              · {durationLabel(req.durationMinutes)}
                             </span>
                           </div>
-                        )}
-                      </td>
-                      <td className="px-2 py-4 align-top text-on-dark-muted max-w-xs">
-                        {req.reason}
-                      </td>
-                      <td className="px-5 py-4 align-top">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleDecision(req.id, "DENIED")}
-                            disabled={isActing}
-                            className="flex items-center gap-1 rounded-md border border-danger/30 px-3 py-1.5 text-xs font-mono uppercase tracking-wide text-danger hover:bg-danger/10 disabled:opacity-50 transition"
-                          >
-                            <X className="w-3 h-3" />
-                            Deny
-                          </button>
-                          <button
-                            onClick={() =>
-                              handleApproveClick(req, isInsufficient)
-                            }
-                            disabled={isActing}
-                            className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-mono uppercase tracking-wide text-white disabled:opacity-50 transition ${
-                              isConfirming
-                                ? "bg-warning hover:bg-warning/90"
-                                : "bg-brand hover:bg-brand-hover"
-                            }`}
-                          >
-                            <Check className="w-3 h-3" />
-                            {isActing
-                              ? "..."
-                              : isConfirming
-                                ? "Confirm anyway"
-                                : "Approve"}
-                          </button>
-                        </div>
-                        {isConfirming && !isActing && (
-                          <button
-                            onClick={() => setConfirmingId(null)}
-                            className="mt-1.5 block ml-auto text-[10px] font-mono uppercase tracking-wide text-on-dark-muted hover:text-on-dark transition"
-                          >
-                            Cancel
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                          {isInsufficient && (
+                            <div className="mt-1.5 flex items-start gap-1 text-[10px] text-warning max-w-[220px]">
+                              <AlertTriangle className="w-3 h-3 shrink-0 relative top-px" />
+                              <span>
+                                Requires at least{" "}
+                                <span className="font-semibold">
+                                  {req.resource.requiredRole.name}
+                                </span>{" "}
+                                — this grant won't actually meet that level.
+                              </span>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-2 py-4 align-top text-on-dark-muted max-w-xs">
+                          {req.reason}
+                        </td>
+                        <td className="px-5 py-4 align-top">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleDecision(req.id, "DENIED")}
+                              disabled={isActing}
+                              className="flex items-center gap-1 rounded-md border border-danger/30 px-3 py-1.5 text-xs font-mono uppercase tracking-wide text-danger hover:bg-danger/10 disabled:opacity-50 transition whitespace-nowrap"
+                            >
+                              <X className="w-3 h-3" />
+                              Deny
+                            </button>
+                            <button
+                              onClick={() =>
+                                handleApproveClick(req, isInsufficient)
+                              }
+                              disabled={isActing}
+                              className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-mono uppercase tracking-wide text-white disabled:opacity-50 transition whitespace-nowrap ${
+                                isConfirming
+                                  ? "bg-warning hover:bg-warning/90"
+                                  : "bg-brand hover:bg-brand-hover"
+                              }`}
+                            >
+                              <Check className="w-3 h-3" />
+                              {isActing
+                                ? "..."
+                                : isConfirming
+                                  ? "Confirm anyway"
+                                  : "Approve"}
+                            </button>
+                          </div>
+                          {isConfirming && !isActing && (
+                            <button
+                              onClick={() => setConfirmingId(null)}
+                              className="mt-1.5 block ml-auto text-[10px] font-mono uppercase tracking-wide text-on-dark-muted hover:text-on-dark transition"
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>

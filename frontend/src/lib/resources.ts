@@ -79,3 +79,12 @@ export const deleteResource = async (id: string): Promise<void> => {
 export const deleteGrant = async (grantId: string): Promise<void> => {
   await api.delete(`/grants/${grantId}`);
 };
+
+export const fetchMyGrants = async (): Promise<Grant[]> => {
+  const { data } = await api.get("/grants/mine");
+  return data.grants;
+};
+
+export const surrenderGrant = async (grantId: string): Promise<void> => {
+  await api.patch(`/grants/${grantId}/surrender`);
+};

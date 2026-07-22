@@ -66,15 +66,12 @@ const ResourceDetailPage = () => {
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [actingGrantId, setActingGrantId] = useState<string | null>(null);
+  const [actingAction, setActingAction] = useState<"revoke" | "delete" | null>(
+    null,
+  );
 
-  // True ownership — used to decide whether this account can have a
-  // personal "my request" on this resource at all. An admin who does not
-  // own the resource can still be a requester, so this must stay separate
-  // from isOwnerOrAdmin below.
   const isOwner = resource ? resource.ownerId === user?.id : false;
 
-  // Owner-or-platform-admin — used only to decide whether the grants
-  // management panel is shown.
   const isOwnerOrAdmin = resource
     ? resource.ownerId === user?.id || user?.role === "ADMIN"
     : false;
@@ -112,15 +109,11 @@ const ResourceDetailPage = () => {
         const isTrueOwner = resourceData.ownerId === user?.id;
         const isAdminOverride = user?.role === "ADMIN";
 
-        // Grants panel: visible to the true owner OR a platform admin.
         if (isTrueOwner || isAdminOverride) {
           const grantsData = await fetchGrantsForResource(id);
           setGrants(grantsData);
         }
 
-        // Personal request status: fetched for anyone who isn't the true
-        // owner, regardless of platform role — an admin can still be a
-        // requester on a resource they don't own.
         if (!isTrueOwner) {
           const request = await fetchMyRequestForResource(id).catch(() => null);
           setMyRequest(request);
@@ -137,23 +130,32 @@ const ResourceDetailPage = () => {
 
   const handleRevoke = async (grantId: string) => {
     setActingGrantId(grantId);
+    setActingAction("revoke");
     try {
       await revokeGrantApi(grantId);
       setGrants((prev) =>
         prev.map((g) => (g.id === grantId ? { ...g, status: "REVOKED" } : g)),
       );
+      // The revoked grant might be the one backing the current
+      // Access_Trace message (e.g. an admin revoking their own grant) —
+      // refresh it so the panel doesn't show stale access info.
+      await refreshAccess();
     } finally {
       setActingGrantId(null);
+      setActingAction(null);
     }
   };
 
   const handleDeleteGrant = async (grantId: string) => {
     setActingGrantId(grantId);
+    setActingAction("delete");
     try {
       await deleteGrant(grantId);
       setGrants((prev) => prev.filter((g) => g.id !== grantId));
+      await refreshAccess();
     } finally {
       setActingGrantId(null);
+      setActingAction(null);
     }
   };
 
@@ -348,77 +350,81 @@ const ResourceDetailPage = () => {
                     No grants yet.
                   </p>
                 ) : (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-[10px] font-mono uppercase tracking-widest text-on-dark-muted">
-                        <th className="text-left font-medium px-5 py-2">
-                          User
-                        </th>
-                        <th className="text-left font-medium px-2 py-2">
-                          Role
-                        </th>
-                        <th className="text-left font-medium px-2 py-2">
-                          Expires
-                        </th>
-                        <th className="text-right font-medium px-5 py-2">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {grants.map((grant) => (
-                        <tr
-                          key={grant.id}
-                          className="border-t border-border-dark"
-                        >
-                          <td className="px-5 py-3 text-on-dark">
-                            {grant.subjectType === "USER"
-                              ? (grant.user?.username ?? "Unknown user")
-                              : (grant.group?.name ?? "Unknown group")}
-                          </td>
-                          <td className="px-2 py-3">
-                            <span
-                              className={`rounded px-1.5 py-0.5 text-[10px] font-mono uppercase ${
-                                ROLE_BADGE_STYLES[
-                                  grant.role?.name.toLowerCase() ?? "viewer"
-                                ]
-                              }`}
-                            >
-                              {grant.role?.name}
-                            </span>
-                          </td>
-                          <td className="px-2 py-3 text-on-dark-muted text-xs">
-                            {grant.status === "ACTIVE"
-                              ? expiresLabel(grant.expiresAt)
-                              : grant.status}
-                          </td>
-                          <td className="px-5 py-3 text-right">
-                            {grant.status === "ACTIVE" ? (
-                              <button
-                                onClick={() => handleRevoke(grant.id)}
-                                disabled={actingGrantId === grant.id}
-                                className="text-xs font-mono uppercase text-danger hover:underline disabled:opacity-50"
-                              >
-                                {actingGrantId === grant.id
-                                  ? "Revoking..."
-                                  : "Revoke"}
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleDeleteGrant(grant.id)}
-                                disabled={actingGrantId === grant.id}
-                                className="text-xs font-mono uppercase text-on-dark-muted hover:text-danger transition disabled:opacity-50"
-                              >
-                                {actingGrantId === grant.id
-                                  ? "Deleting..."
-                                  : "Delete"}
-                              </button>
-                            )}
-                          </td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[560px] text-sm">
+                      <thead>
+                        <tr className="text-[10px] font-mono uppercase tracking-widest text-on-dark-muted">
+                          <th className="text-left font-medium px-5 py-2">
+                            User
+                          </th>
+                          <th className="text-left font-medium px-2 py-2">
+                            Role
+                          </th>
+                          <th className="text-left font-medium px-2 py-2">
+                            Expires
+                          </th>
+                          <th className="text-right font-medium px-5 py-2">
+                            Actions
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {grants.map((grant) => (
+                          <tr
+                            key={grant.id}
+                            className="border-t border-border-dark"
+                          >
+                            <td className="px-5 py-3 text-on-dark whitespace-nowrap">
+                              {grant.subjectType === "USER"
+                                ? (grant.user?.username ?? "Unknown user")
+                                : (grant.group?.name ?? "Unknown group")}
+                            </td>
+                            <td className="px-2 py-3 whitespace-nowrap">
+                              <span
+                                className={`rounded px-1.5 py-0.5 text-[10px] font-mono uppercase ${
+                                  ROLE_BADGE_STYLES[
+                                    grant.role?.name.toLowerCase() ?? "viewer"
+                                  ]
+                                }`}
+                              >
+                                {grant.role?.name}
+                              </span>
+                            </td>
+                            <td className="px-2 py-3 text-on-dark-muted text-xs whitespace-nowrap">
+                              {grant.status === "ACTIVE"
+                                ? expiresLabel(grant.expiresAt)
+                                : grant.status}
+                            </td>
+                            <td className="px-5 py-3 text-right whitespace-nowrap">
+                              {grant.status === "ACTIVE" ? (
+                                <button
+                                  onClick={() => handleRevoke(grant.id)}
+                                  disabled={actingGrantId === grant.id}
+                                  className="text-xs font-mono uppercase text-danger hover:underline disabled:opacity-50"
+                                >
+                                  {actingGrantId === grant.id &&
+                                  actingAction === "revoke"
+                                    ? "Revoking..."
+                                    : "Revoke"}
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleDeleteGrant(grant.id)}
+                                  disabled={actingGrantId === grant.id}
+                                  className="text-xs font-mono uppercase text-on-dark-muted hover:text-danger transition disabled:opacity-50"
+                                >
+                                  {actingGrantId === grant.id &&
+                                  actingAction === "delete"
+                                    ? "Deleting..."
+                                    : "Delete"}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             )}

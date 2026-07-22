@@ -12,7 +12,6 @@ const DURATION_OPTIONS = [
   { label: "Custom", minutes: -1 },
 ];
 
-// Keep in sync with your seeded Role.rank values.
 const ROLE_RANKS: Record<string, number> = {
   viewer: 1,
   editor: 2,
@@ -62,8 +61,6 @@ export const RequestAccessModal = ({
     const requiredRank =
       ROLE_RANKS[resource.requiredRole.name.toLowerCase()] ?? 0;
 
-    // Checkpoint 1: doesn't even clear the resource's floor.
-    // Can never auto-approve, and a rule is irrelevant here.
     if (requestedRank < requiredRank) {
       setBelowRequiredRole(true);
       setLikelyAutoApprove(false);

@@ -98,4 +98,72 @@ const deleteGrant = async (req, res) => {
   }
 };
 
-export { revokeGrant, getResourceGrants, deleteGrant };
+const surrenderGrant = async (req, res) => {
+  try {
+    const grant = await prisma.grant.findUnique({
+      where: { id: req.params.id },
+      include: GRANT_INCLUDE,
+    });
+
+    if (!grant) {
+      return res.status(404).json({ message: "Grant not found" });
+    }
+
+    if (grant.subjectType !== "USER" || grant.userId !== req.user.id) {
+      return res
+        .status(403)
+        .json({ message: "You can only surrender your own grants" });
+    }
+
+    if (grant.status !== "ACTIVE") {
+      return res
+        .status(400)
+        .json({ message: "This grant is not currently active" });
+    }
+
+    const updated = await prisma.grant.update({
+      where: { id: req.params.id },
+      data: { status: "SURRENDERED" },
+      include: GRANT_INCLUDE,
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.user.id,
+        action: "GRANT_SURRENDERED",
+        resourceId: grant.resourceId,
+        detail: { grantId: grant.id, role: grant.role.name },
+      },
+    });
+
+    res
+      .status(200)
+      .json({ message: "Access surrendered successfully", grant: updated });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const getMyGrants = async (req, res) => {
+  try {
+    const grants = await prisma.grant.findMany({
+      where: { subjectType: "USER", userId: req.user.id },
+      include: GRANT_INCLUDE,
+      orderBy: { grantedAt: "desc" },
+    });
+
+    res.status(200).json({ grants });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export {
+  revokeGrant,
+  getResourceGrants,
+  deleteGrant,
+  getMyGrants,
+  surrenderGrant,
+};
