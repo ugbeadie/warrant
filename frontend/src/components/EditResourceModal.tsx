@@ -62,7 +62,14 @@ export const EditResourceModal = ({
         setExistingRule(rule);
         if (rule) {
           setAddRule(rule.autoApprove);
-          setRuleMaxRoleName(rule.maxRole.name.toLowerCase());
+          const loadedMaxRole = rule.maxRole.name.toLowerCase();
+          // Clamp immediately if the saved rule's maxRole is now invalid
+          // relative to the resource's required role.
+          setRuleMaxRoleName(
+            rankOf(loadedMaxRole) < rankOf(requiredRoleName)
+              ? requiredRoleName
+              : loadedMaxRole,
+          );
           setRuleMaxDuration(String(rule.condition.maxDuration ?? ""));
         }
       })
@@ -194,8 +201,9 @@ export const EditResourceModal = ({
                     ))}
                   </select>
                   <p className="mt-1 text-[10px] text-on-dark-muted">
-                    Must be at or above the required role. Requests at or below
-                    this role and duration will be auto-approved.
+                    Ceiling for auto-approval. Must be ≥ Required Role. Anything
+                    requested below Required Role or above this ceiling will
+                    need manual review.
                   </p>
                 </div>
                 <div>

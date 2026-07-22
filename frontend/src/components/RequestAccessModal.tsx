@@ -19,6 +19,8 @@ const ROLE_RANKS: Record<string, number> = {
   admin: 3,
 };
 
+const articleFor = (word: string) => (/^[aeiou]/i.test(word) ? "an" : "a");
+
 interface RequestAccessModalProps {
   resource: Resource;
   isOwner?: boolean;
@@ -42,6 +44,7 @@ export const RequestAccessModal = ({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [likelyAutoApprove, setLikelyAutoApprove] = useState(false);
+  const [belowRequiredRole, setBelowRequiredRole] = useState(false);
 
   const isCustom = durationChoice === -1;
 
@@ -55,10 +58,22 @@ export const RequestAccessModal = ({
   useEffect(() => {
     if (isOwner) return;
 
+    const requestedRank = ROLE_RANKS[requestedRoleName] ?? Infinity;
+    const requiredRank =
+      ROLE_RANKS[resource.requiredRole.name.toLowerCase()] ?? 0;
+
+    // Checkpoint 1: doesn't even clear the resource's floor.
+    // Can never auto-approve, and a rule is irrelevant here.
+    if (requestedRank < requiredRank) {
+      setBelowRequiredRole(true);
+      setLikelyAutoApprove(false);
+      return;
+    }
+
+    setBelowRequiredRole(false);
+
     fetchPolicyRulesForResource(resource.id)
       .then((rules) => {
-        const requestedRank = ROLE_RANKS[requestedRoleName] ?? Infinity;
-
         const match = rules.some((r) => {
           if (!r.autoApprove) return false;
 
@@ -76,7 +91,13 @@ export const RequestAccessModal = ({
         setLikelyAutoApprove(match);
       })
       .catch(() => setLikelyAutoApprove(false));
-  }, [resource.id, durationMinutes, requestedRoleName, isOwner]);
+  }, [
+    resource.id,
+    resource.requiredRole.name,
+    durationMinutes,
+    requestedRoleName,
+    isOwner,
+  ]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,10 +158,20 @@ export const RequestAccessModal = ({
               onChange={(e) => setRequestedRoleName(e.target.value)}
               className="w-full rounded-md border border-border-dark bg-bg px-3 py-2.5 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             >
-              <option value="viewer">Viewer (Read-only)</option>
+              <option value="viewer">Viewer</option>
               <option value="editor">Editor</option>
               <option value="admin">Admin</option>
             </select>
+            {belowRequiredRole && (
+              <p className="mt-1 text-[10px] text-warning">
+                This resource requires at least{" "}
+                <span className="font-semibold">
+                  {resource.requiredRole.name}
+                </span>{" "}
+                access — {articleFor(requestedRoleName)} "{requestedRoleName}"
+                grant won't actually meet that requirement even if approved.
+              </p>
+            )}
           </div>
 
           <div>
@@ -199,6 +230,11 @@ export const RequestAccessModal = ({
             <div className="rounded-md border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
               You own this resource — this will auto-approve instantly and be
               logged for audit purposes.
+            </div>
+          ) : belowRequiredRole ? (
+            <div className="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-500">
+              This role does not meet the resource's required level — even if
+              approved, it won't grant access.
             </div>
           ) : likelyAutoApprove ? (
             <div className="rounded-md border border-success/20 bg-success/10 px-3 py-2 text-xs text-success">

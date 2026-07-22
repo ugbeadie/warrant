@@ -25,7 +25,6 @@ import { EditResourceModal } from "../components/EditResourceModal";
 import { ConfirmDeleteModal } from "../components/ConfirmDeleteModal";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-// import { Pencil, Trash2 } from "lucide-react";
 import type {
   Resource,
   CheckAccessResult,
@@ -68,10 +67,17 @@ const ResourceDetailPage = () => {
   const [deleting, setDeleting] = useState(false);
   const [actingGrantId, setActingGrantId] = useState<string | null>(null);
 
+  // True ownership — used to decide whether this account can have a
+  // personal "my request" on this resource at all. An admin who does not
+  // own the resource can still be a requester, so this must stay separate
+  // from isOwnerOrAdmin below.
+  const isOwner = resource ? resource.ownerId === user?.id : false;
+
+  // Owner-or-platform-admin — used only to decide whether the grants
+  // management panel is shown.
   const isOwnerOrAdmin = resource
     ? resource.ownerId === user?.id || user?.role === "ADMIN"
     : false;
-  const isOwner = resource ? resource.ownerId === user?.id : false;
 
   const refreshGrants = useCallback(async () => {
     if (!id) return;
@@ -103,15 +109,23 @@ const ResourceDetailPage = () => {
         const accessResult = await checkResourceAccess(id);
         setAccess(accessResult);
 
-        const owner =
-          resourceData.ownerId === user?.id || user?.role === "ADMIN";
+        const isTrueOwner = resourceData.ownerId === user?.id;
+        const isAdminOverride = user?.role === "ADMIN";
 
-        if (owner) {
+        // Grants panel: visible to the true owner OR a platform admin.
+        if (isTrueOwner || isAdminOverride) {
           const grantsData = await fetchGrantsForResource(id);
           setGrants(grantsData);
-        } else {
+        }
+
+        // Personal request status: fetched for anyone who isn't the true
+        // owner, regardless of platform role — an admin can still be a
+        // requester on a resource they don't own.
+        if (!isTrueOwner) {
           const request = await fetchMyRequestForResource(id).catch(() => null);
           setMyRequest(request);
+        } else {
+          setMyRequest(null);
         }
       } finally {
         setLoading(false);
@@ -170,7 +184,7 @@ const ResourceDetailPage = () => {
       await Promise.all([
         refreshAccess(),
         isOwnerOrAdmin ? refreshGrants() : Promise.resolve(),
-        refreshMyRequest(),
+        isOwner ? Promise.resolve() : refreshMyRequest(),
       ]);
     } finally {
       setRefreshingAfterSubmit(false);

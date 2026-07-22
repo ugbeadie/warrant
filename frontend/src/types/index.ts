@@ -64,6 +64,13 @@ export interface AccessRequest {
   requestedRole: Role;
   approver: User | null;
   grant?: Grant | null;
+  // Computed server-side (see withSufficiencyFlag in requests.js): true when
+  // requestedRole.rank >= resource.requiredRole.rank. Only populated on
+  // responses from getPendingRequestsForOwner, getAllPendingRequests, and
+  // decideRequest — undefined elsewhere, so checks should use `=== false`
+  // rather than `!meetsRequiredRole` to avoid treating "not yet computed"
+  // as "insufficient".
+  meetsRequiredRole?: boolean;
 }
 
 export interface Grant {

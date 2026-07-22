@@ -161,8 +161,9 @@ export const CreateResourceModal = ({
                     ))}
                   </select>
                   <p className="mt-1 text-[10px] text-on-dark-muted">
-                    Must be at or above the required role. Requests at or below
-                    this role and duration will be auto-approved.
+                    Ceiling for auto-approval. Must be ≥ Required Role. Anything
+                    requested below Required Role or above this ceiling will
+                    need manual review.{" "}
                   </p>
                 </div>
                 <div>
