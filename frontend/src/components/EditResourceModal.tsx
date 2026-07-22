@@ -35,7 +35,7 @@ export const EditResourceModal = ({
 
   const [addRule, setAddRule] = useState(false);
   const [ruleMaxRoleName, setRuleMaxRoleName] = useState("viewer");
-  const [ruleMaxDuration, setRuleMaxDuration] = useState("1440");
+  const [ruleMaxDuration, setRuleMaxDuration] = useState("");
 
   const [existingRule, setExistingRule] = useState<PolicyRule | null>(null);
   const [rulesLoading, setRulesLoading] = useState(true);
@@ -49,7 +49,6 @@ export const EditResourceModal = ({
 
   const handleRequiredRoleChange = (value: string) => {
     setRequiredRoleName(value);
-    // Keep the auto-approve ceiling from falling below the new floor.
     if (rankOf(ruleMaxRoleName) < rankOf(value)) {
       setRuleMaxRoleName(value);
     }
@@ -63,8 +62,6 @@ export const EditResourceModal = ({
         if (rule) {
           setAddRule(rule.autoApprove);
           const loadedMaxRole = rule.maxRole.name.toLowerCase();
-          // Clamp immediately if the saved rule's maxRole is now invalid
-          // relative to the resource's required role.
           setRuleMaxRoleName(
             rankOf(loadedMaxRole) < rankOf(requiredRoleName)
               ? requiredRoleName
@@ -86,6 +83,11 @@ export const EditResourceModal = ({
       return;
     }
 
+    const safeMaxRole =
+      rankOf(ruleMaxRoleName) < rankOf(requiredRoleName)
+        ? requiredRoleName
+        : ruleMaxRoleName;
+
     setSaving(true);
     try {
       const updated = await updateResource(resource.id, {
@@ -99,7 +101,7 @@ export const EditResourceModal = ({
         if (existingRule) {
           const updatedRule = await updatePolicyRule(existingRule.id, {
             autoApprove: true,
-            maxRoleName: ruleMaxRoleName,
+            maxRoleName: safeMaxRole,
             condition: { maxDuration: durationNum },
           });
           setExistingRule(updatedRule);
@@ -107,7 +109,7 @@ export const EditResourceModal = ({
           const newRule = await createPolicyRule({
             resourceId: resource.id,
             autoApprove: true,
-            maxRoleName: ruleMaxRoleName,
+            maxRoleName: safeMaxRole,
             condition: { maxDuration: durationNum },
           });
           setExistingRule(newRule);
@@ -187,7 +189,7 @@ export const EditResourceModal = ({
               <div className="mt-3 space-y-3">
                 <div>
                   <label className="block text-[11px] font-mono uppercase tracking-widest text-on-dark-muted mb-1.5">
-                    Max Auto-Approved Role
+                    Auto-Approval Ceiling
                   </label>
                   <select
                     value={ruleMaxRoleName}
@@ -201,9 +203,10 @@ export const EditResourceModal = ({
                     ))}
                   </select>
                   <p className="mt-1 text-[10px] text-on-dark-muted">
-                    Ceiling for auto-approval. Must be ≥ Required Role. Anything
-                    requested below Required Role or above this ceiling will
-                    need manual review.
+                    Requests for roles between the required role and this
+                    ceiling are approved automatically. Below the required role,
+                    access is never possible. Above this ceiling, a human always
+                    reviews it.
                   </p>
                 </div>
                 <div>
@@ -221,7 +224,7 @@ export const EditResourceModal = ({
                       }
                     }}
                     placeholder="e.g. 60"
-                    className="w-full rounded-md border border-border-dark bg-surface-raised px-3 py-2 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                    className="w-full rounded-md border border-border-dark bg-surface-raised px-3 py-2.5 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                   />
                 </div>
               </div>

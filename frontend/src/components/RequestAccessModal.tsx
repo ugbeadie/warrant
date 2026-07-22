@@ -12,13 +12,12 @@ const DURATION_OPTIONS = [
   { label: "Custom", minutes: -1 },
 ];
 
+// Keep in sync with your seeded Role.rank values.
 const ROLE_RANKS: Record<string, number> = {
   viewer: 1,
   editor: 2,
   admin: 3,
 };
-
-const articleFor = (word: string) => (/^[aeiou]/i.test(word) ? "an" : "a");
 
 interface RequestAccessModalProps {
   resource: Resource;
@@ -44,6 +43,7 @@ export const RequestAccessModal = ({
   const [error, setError] = useState("");
   const [likelyAutoApprove, setLikelyAutoApprove] = useState(false);
   const [belowRequiredRole, setBelowRequiredRole] = useState(false);
+  const [checkingPolicy, setCheckingPolicy] = useState(true);
 
   const isCustom = durationChoice === -1;
 
@@ -64,10 +64,12 @@ export const RequestAccessModal = ({
     if (requestedRank < requiredRank) {
       setBelowRequiredRole(true);
       setLikelyAutoApprove(false);
+      setCheckingPolicy(false);
       return;
     }
 
     setBelowRequiredRole(false);
+    setCheckingPolicy(true);
 
     fetchPolicyRulesForResource(resource.id)
       .then((rules) => {
@@ -87,7 +89,8 @@ export const RequestAccessModal = ({
 
         setLikelyAutoApprove(match);
       })
-      .catch(() => setLikelyAutoApprove(false));
+      .catch(() => setLikelyAutoApprove(false))
+      .finally(() => setCheckingPolicy(false));
   }, [
     resource.id,
     resource.requiredRole.name,
@@ -160,13 +163,12 @@ export const RequestAccessModal = ({
               <option value="admin">Admin</option>
             </select>
             {belowRequiredRole && (
-              <p className="mt-1 text-[10px] text-warning">
+              <p className="mt-1.5 text-[11px] font-mono text-warning">
                 This resource requires at least{" "}
                 <span className="font-semibold">
                   {resource.requiredRole.name}
                 </span>{" "}
-                access — {articleFor(requestedRoleName)} "{requestedRoleName}"
-                grant won't actually meet that requirement even if approved.
+                — a lower role will never grant access, even if approved.
               </p>
             )}
           </div>
@@ -190,8 +192,9 @@ export const RequestAccessModal = ({
             {isCustom && (
               <div className="mt-2 flex gap-2">
                 <input
-                  type="number"
-                  min={1}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={customValue}
                   onChange={(e) => setCustomValue(Number(e.target.value))}
                   className="w-24 rounded-md border border-border-dark bg-bg px-3 py-2 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
@@ -229,9 +232,13 @@ export const RequestAccessModal = ({
               logged for audit purposes.
             </div>
           ) : belowRequiredRole ? (
-            <div className="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-500">
+            <div className="rounded-md border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
               This role does not meet the resource's required level — even if
               approved, it won't grant access.
+            </div>
+          ) : checkingPolicy ? (
+            <div className="rounded-md border border-border-dark bg-bg px-3 py-2 text-xs text-on-dark-muted">
+              Checking approval policy...
             </div>
           ) : likelyAutoApprove ? (
             <div className="rounded-md border border-success/20 bg-success/10 px-3 py-2 text-xs text-success">

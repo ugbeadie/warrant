@@ -42,9 +42,13 @@ const checkAccess = async (userId, resourceId) => {
         data: { lastAccessedAt: now },
       });
 
+      const isOwnerGrant = resource.ownerId === userId;
+
       return {
         hasAccess: true,
-        reason: `Direct grant: you have "${bestGrant.role.name}" access to this resource, expiring ${formatExpiry(bestGrant.expiresAt)}.`,
+        reason: isOwnerGrant
+          ? `Owner session active: "${bestGrant.role.name}" access, expiring ${formatExpiry(bestGrant.expiresAt)}.`
+          : `Direct grant: you have "${bestGrant.role.name}" access to this resource, expiring ${formatExpiry(bestGrant.expiresAt)}.`,
         source: "direct",
         grant: bestGrant,
       };

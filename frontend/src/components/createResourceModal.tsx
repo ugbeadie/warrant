@@ -27,7 +27,7 @@ export const CreateResourceModal = ({
 
   const [addRule, setAddRule] = useState(false);
   const [ruleMaxRoleName, setRuleMaxRoleName] = useState("viewer");
-  const [ruleMaxDuration, setRuleMaxDuration] = useState("1440");
+  const [ruleMaxDuration, setRuleMaxDuration] = useState("");
 
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
