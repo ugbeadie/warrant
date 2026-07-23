@@ -1,11 +1,19 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Key, Users, Shield } from "lucide-react";
-import { fetchMyGrants, surrenderGrant } from "../lib/resources";
+import {
+  fetchMyGrants,
+  surrenderGrant,
+  fetchMyGroupGrants,
+} from "../lib/resources";
 import { AppLayout } from "../components/AppLayout";
 import { SkeletonRow } from "../components/SkeletonRow";
 import type { Grant, GroupMember, Group } from "../types";
-import { fetchMyMemberships, fetchMyOwnedGroups } from "../lib/groups";
+import {
+  fetchMyMemberships,
+  fetchMyOwnedGroups,
+  leaveGroup,
+} from "../lib/groups";
 
 const ROLE_BADGE_STYLES: Record<string, string> = {
   admin: "bg-danger/15 text-danger",
@@ -41,6 +49,7 @@ const isUnused = (grant: Grant) => {
 
 const MyAccessPage = () => {
   const [grants, setGrants] = useState<Grant[]>([]);
+  const [groupGrants, setGroupGrants] = useState<Grant[]>([]);
   const [memberships, setMemberships] = useState<GroupMember[]>([]);
   const [ownedGroups, setOwnedGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,14 +57,30 @@ const MyAccessPage = () => {
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    Promise.all([fetchMyGrants(), fetchMyMemberships(), fetchMyOwnedGroups()])
-      .then(([grantsData, membershipsData, ownedData]) => {
+  const [leavingGroupId, setLeavingGroupId] = useState<string | null>(null);
+  const [confirmingLeaveId, setConfirmingLeaveId] = useState<string | null>(
+    null,
+  );
+
+  const loadAll = () => {
+    setLoading(true);
+    Promise.all([
+      fetchMyGrants(),
+      fetchMyMemberships(),
+      fetchMyOwnedGroups(),
+      fetchMyGroupGrants(),
+    ])
+      .then(([grantsData, membershipsData, ownedData, groupGrantsData]) => {
         setGrants(grantsData);
         setMemberships(membershipsData);
         setOwnedGroups(ownedData);
+        setGroupGrants(groupGrantsData);
       })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadAll();
   }, []);
 
   const handleSurrender = async (grantId: string) => {
@@ -78,6 +103,27 @@ const MyAccessPage = () => {
     } finally {
       setActingId(null);
       setConfirmingId(null);
+    }
+  };
+
+  const handleLeaveGroup = async (groupId: string) => {
+    if (confirmingLeaveId !== groupId) {
+      setConfirmingLeaveId(groupId);
+      return;
+    }
+
+    setError("");
+    setLeavingGroupId(groupId);
+    try {
+      await leaveGroup(groupId);
+      setMemberships((prev) => prev.filter((m) => m.groupId !== groupId));
+      // Group access derived from this membership no longer applies.
+      setGroupGrants((prev) => prev.filter((g) => g.groupId !== groupId));
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Failed to leave group");
+    } finally {
+      setLeavingGroupId(null);
+      setConfirmingLeaveId(null);
     }
   };
 
@@ -209,6 +255,76 @@ const MyAccessPage = () => {
 
         <div className="mt-6 rounded-xl border border-border-dark bg-surface-raised overflow-hidden">
           <div className="flex items-center gap-2 px-5 py-4 border-b border-border-dark">
+            <Key className="w-4 h-4 text-on-dark-muted" />
+            <p className="text-xs font-mono uppercase tracking-widest text-on-dark-muted">
+              Group_Access
+            </p>
+          </div>
+
+          {loading ? (
+            <>
+              <SkeletonRow />
+              <SkeletonRow />
+            </>
+          ) : groupGrants.length === 0 ? (
+            <p className="px-5 py-8 text-center text-sm text-on-dark-muted">
+              No resource access via groups yet.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px] text-sm">
+                <thead>
+                  <tr className="text-[10px] font-mono uppercase tracking-widest text-on-dark-muted border-b border-border-dark">
+                    <th className="text-left font-medium px-5 py-3">
+                      Resource
+                    </th>
+                    <th className="text-left font-medium px-2 py-3">Role</th>
+                    <th className="text-left font-medium px-2 py-3">
+                      Via Group
+                    </th>
+                    <th className="text-left font-medium px-2 py-3">Expires</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groupGrants.map((grant) => {
+                    const roleKey = grant.role?.name.toLowerCase() ?? "viewer";
+                    return (
+                      <tr
+                        key={grant.id}
+                        className="border-b border-border-dark last:border-0"
+                      >
+                        <td className="px-5 py-3 whitespace-nowrap">
+                          <Link
+                            to={`/resources/${grant.resourceId}`}
+                            className="text-sm font-medium text-on-dark hover:text-brand transition"
+                          >
+                            {grant.resource?.name ?? "Unknown resource"}
+                          </Link>
+                        </td>
+                        <td className="px-2 py-3 whitespace-nowrap">
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wide ${ROLE_BADGE_STYLES[roleKey]}`}
+                          >
+                            {grant.role?.name}
+                          </span>
+                        </td>
+                        <td className="px-2 py-3 text-on-dark-muted text-xs whitespace-nowrap">
+                          {grant.viaGroupName}
+                        </td>
+                        <td className="px-2 py-3 text-on-dark-muted text-xs whitespace-nowrap">
+                          {expiresLabel(grant.expiresAt)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-6 rounded-xl border border-border-dark bg-surface-raised overflow-hidden">
+          <div className="flex items-center gap-2 px-5 py-4 border-b border-border-dark">
             <Users className="w-4 h-4 text-on-dark-muted" />
             <p className="text-xs font-mono uppercase tracking-widest text-on-dark-muted">
               Group_Memberships
@@ -222,33 +338,64 @@ const MyAccessPage = () => {
               You're not in any groups yet.
             </p>
           ) : (
-            memberships.map((m) => (
-              <div
-                key={m.id}
-                className="flex items-center justify-between px-5 py-4 border-b border-border-dark last:border-0"
-              >
-                <div>
-                  <p className="text-sm font-medium text-on-dark">
-                    {m.group?.name}
-                  </p>
-                  <p className="mt-1 text-xs text-on-dark-muted">
-                    ·{" "}
-                    {m.status === "ACTIVE"
-                      ? expiresLabel(m.expiresAt)
-                      : m.status.toLowerCase()}
-                  </p>
-                </div>
-                <span
-                  className={`rounded px-2 py-0.5 text-[10px] font-mono uppercase tracking-wide ${
-                    m.status === "ACTIVE"
-                      ? "bg-success/15 text-success"
-                      : "bg-neutral/15 text-neutral"
-                  }`}
+            memberships.map((m) => {
+              const isConfirmingLeave = confirmingLeaveId === m.groupId;
+              const isLeaving = leavingGroupId === m.groupId;
+              const isOwnedByMe = ownedGroups.some((g) => g.id === m.groupId);
+
+              return (
+                <div
+                  key={m.id}
+                  className="flex items-center justify-between px-5 py-4 border-b border-border-dark last:border-0"
                 >
-                  {m.status}
-                </span>
-              </div>
-            ))
+                  <div>
+                    <p className="text-sm font-medium text-on-dark">
+                      {m.group?.name}
+                    </p>
+                    <p className="mt-1 text-xs text-on-dark-muted">
+                      ·{" "}
+                      {m.status === "ACTIVE"
+                        ? expiresLabel(m.expiresAt)
+                        : m.status.toLowerCase()}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`rounded px-2 py-0.5 text-[10px] font-mono uppercase tracking-wide ${
+                        m.status === "ACTIVE"
+                          ? "bg-success/15 text-success"
+                          : "bg-neutral/15 text-neutral"
+                      }`}
+                    >
+                      {m.status}
+                    </span>
+                    {m.status === "ACTIVE" && !isOwnedByMe && (
+                      <>
+                        {isConfirmingLeave && !isLeaving && (
+                          <button
+                            onClick={() => setConfirmingLeaveId(null)}
+                            className="text-[10px] font-mono uppercase tracking-wide text-on-dark-muted hover:text-on-dark transition"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleLeaveGroup(m.groupId)}
+                          disabled={isLeaving}
+                          className="rounded-md border border-danger/30 px-3 py-1.5 text-xs font-mono uppercase tracking-wide text-danger hover:bg-danger/10 disabled:opacity-50 transition"
+                        >
+                          {isLeaving
+                            ? "..."
+                            : isConfirmingLeave
+                              ? "Confirm"
+                              : "Leave"}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
 

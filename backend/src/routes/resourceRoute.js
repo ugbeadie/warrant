@@ -9,6 +9,7 @@ import {
   checkResourceAccess,
   updateResource,
   deleteResource,
+  getMyGroupGrants,
 } from "../controllers/resourceController.js";
 import { protect } from "../middlewares/authMiddleware.js";
 
@@ -17,6 +18,7 @@ const router = express.Router();
 router.post("/create", protect, createResource);
 router.get("/all", protect, getResources);
 router.get("/my-resources", protect, getMyResources);
+router.get("/my-group-grants", protect, getMyGroupGrants);
 router.get("/:id", protect, getResourceById);
 router.post("/:id/transfer", protect, transferResourceOwnership);
 router.get("/:id/access-check", protect, checkResourceAccess);

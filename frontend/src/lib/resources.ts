@@ -42,10 +42,6 @@ export const checkResourceAccess = async (
   }
 };
 
-// export const logAccessAttempt = async (id: string): Promise<void> => {
-//   await api.post(`/resources/${id}/access`).catch(() => {});
-// };
-
 export const fetchGrantsForResource = async (
   resourceId: string,
 ): Promise<Grant[]> => {
@@ -87,4 +83,9 @@ export const fetchMyGrants = async (): Promise<Grant[]> => {
 
 export const surrenderGrant = async (grantId: string): Promise<void> => {
   await api.patch(`/grants/${grantId}/surrender`);
+};
+
+export const fetchMyGroupGrants = async (): Promise<Grant[]> => {
+  const { data } = await api.get("/resources/my-group-grants");
+  return data.grants;
 };

@@ -15,6 +15,7 @@ import {
   removeGroupMember,
   deleteGroup,
   transferGroupOwnership,
+  leaveGroup,
 } from "../lib/groups";
 import { searchUsers, type UserSearchResult } from "../lib/users";
 import { AppLayout } from "../components/AppLayout";
@@ -69,7 +70,6 @@ const GroupDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // --- Add Member modal state (owner-only) ---
   const [showAddMember, setShowAddMember] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
@@ -78,33 +78,26 @@ const GroupDetailPage = () => {
     null,
   );
 
-  // Which duration preset is picked in the Add_Member form's <select>
-  // (e.g. 1440 for "1 Day", or -1 to reveal the custom value+unit inputs).
   const [newDurationChoice, setNewDurationChoice] = useState(1440);
   const [customValue, setCustomValue] = useState(1);
   const [customUnit, setCustomUnit] = useState<"minutes" | "hours" | "days">(
     "days",
   );
 
-  // True while addGroupMember() is in flight — disables the submit button
-  // and swaps its label to "Adding..." so it can't be double-submitted.
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState("");
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // --- Member removal state (owner-only) ---
   const [removingUserId, setRemovingUserId] = useState<string | null>(null);
-  // Tracks which member row's Remove button is currently "armed" (first
-  // click shows Confirm, second click actually removes). null = no row
-  // is in the confirming state.
   const [confirmingUserId, setConfirmingUserId] = useState<string | null>(null);
 
-  // --- Delete group state (owner or admin) ---
+  const [leavingSelf, setLeavingSelf] = useState(false);
+  const [confirmingLeaveSelf, setConfirmingLeaveSelf] = useState(false);
+
   const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
 
-  // --- Transfer ownership state (owner or admin) ---
   const [showTransfer, setShowTransfer] = useState(false);
   const [transferQuery, setTransferQuery] = useState("");
   const [transferResults, setTransferResults] = useState<UserSearchResult[]>(
@@ -119,15 +112,13 @@ const GroupDetailPage = () => {
   const [confirmingTransfer, setConfirmingTransfer] = useState(false);
   const transferDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // True ownership — gates day-to-day membership control (add/remove
-  // members). Admin no longer gets these; see isOwnerOrAdmin below for
-  // the coarser powers (delete, transfer) admin retains.
   const isOwner = group ? group.ownerId === user?.id : false;
-
-  // Owner OR platform admin — used only for the heavier, less frequent
-  // actions (delete group, transfer ownership), mirroring how Resources
-  // separates owner-only grant management from admin-level overrides.
   const isOwnerOrAdmin = isOwner || user?.role === "ADMIN";
+
+  const isSelfMember =
+    !isOwner && !!group?.members?.some((m) => m.userId === user?.id);
+
+  const showActionsColumn = isOwner || isSelfMember;
 
   const isCustom = newDurationChoice === -1;
 
@@ -246,6 +237,26 @@ const GroupDetailPage = () => {
     } finally {
       setRemovingUserId(null);
       setConfirmingUserId(null);
+    }
+  };
+
+  const handleLeaveGroup = async () => {
+    if (!id) return;
+
+    if (!confirmingLeaveSelf) {
+      setConfirmingLeaveSelf(true);
+      return;
+    }
+
+    setError("");
+    setLeavingSelf(true);
+    try {
+      await leaveGroup(id);
+      navigate("/groups");
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Failed to leave group");
+      setLeavingSelf(false);
+      setConfirmingLeaveSelf(false);
     }
   };
 
@@ -635,7 +646,7 @@ const GroupDetailPage = () => {
 
                 {transferTarget && (
                   <div className="rounded-md border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
-                    You'll be downgraded to a regular 1-day member.{" "}
+                    You'll be downgraded to a regular 30-day member.{" "}
                     {transferTarget.username} becomes the permanent owner and
                     gains full control of this group.
                   </div>
@@ -699,7 +710,7 @@ const GroupDetailPage = () => {
                   <tr className="text-[10px] font-mono uppercase tracking-widest text-on-dark-muted border-b border-border-dark">
                     <th className="text-left font-medium px-5 py-3">User</th>
                     <th className="text-left font-medium px-2 py-3">Expires</th>
-                    {isOwner && (
+                    {showActionsColumn && (
                       <th className="text-right font-medium px-5 py-3">
                         Actions
                       </th>
@@ -711,6 +722,7 @@ const GroupDetailPage = () => {
                     const isConfirming = confirmingUserId === m.userId;
                     const isRemoving = removingUserId === m.userId;
                     const isMemberOwner = m.userId === group.ownerId;
+                    const isMyOwnRow = m.userId === user?.id;
 
                     return (
                       <tr
@@ -723,13 +735,13 @@ const GroupDetailPage = () => {
                         <td className="px-2 py-3 text-on-dark-muted text-xs whitespace-nowrap">
                           {expiresLabel(m.expiresAt)}
                         </td>
-                        {isOwner && (
+                        {showActionsColumn && (
                           <td className="px-5 py-3 text-right whitespace-nowrap">
                             {isMemberOwner ? (
                               <span className="text-[10px] font-mono uppercase text-on-dark-muted">
                                 Owner
                               </span>
-                            ) : (
+                            ) : isOwner ? (
                               <div className="flex items-center justify-end gap-2">
                                 {isConfirming && !isRemoving && (
                                   <button
@@ -751,7 +763,31 @@ const GroupDetailPage = () => {
                                       : "Remove"}
                                 </button>
                               </div>
-                            )}
+                            ) : isMyOwnRow ? (
+                              <div className="flex items-center justify-end gap-2">
+                                {confirmingLeaveSelf && !leavingSelf && (
+                                  <button
+                                    onClick={() =>
+                                      setConfirmingLeaveSelf(false)
+                                    }
+                                    className="text-[10px] font-mono uppercase tracking-wide text-on-dark-muted hover:text-on-dark transition"
+                                  >
+                                    Cancel
+                                  </button>
+                                )}
+                                <button
+                                  onClick={handleLeaveGroup}
+                                  disabled={leavingSelf}
+                                  className="text-xs font-mono uppercase text-danger hover:underline disabled:opacity-50"
+                                >
+                                  {leavingSelf
+                                    ? "Leaving..."
+                                    : confirmingLeaveSelf
+                                      ? "Confirm"
+                                      : "Leave"}
+                                </button>
+                              </div>
+                            ) : null}
                           </td>
                         )}
                       </tr>

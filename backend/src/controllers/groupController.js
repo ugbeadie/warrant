@@ -323,6 +323,47 @@ const deleteGroup = async (req, res) => {
   }
 };
 
+const leaveGroup = async (req, res) => {
+  try {
+    const group = await prisma.group.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    if (group.ownerId === req.user.id) {
+      return res.status(400).json({
+        message:
+          "The group owner cannot leave. Transfer ownership first if you want to step down.",
+      });
+    }
+
+    const membership = await prisma.groupMember.findUnique({
+      where: {
+        groupId_userId: { groupId: req.params.id, userId: req.user.id },
+      },
+    });
+
+    if (!membership || membership.status !== "ACTIVE") {
+      return res
+        .status(400)
+        .json({ message: "You are not an active member of this group" });
+    }
+
+    await prisma.groupMember.update({
+      where: { id: membership.id },
+      data: { status: "EXPIRED" },
+    });
+
+    res.status(200).json({ message: "You have left the group" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 export {
   createGroup,
   getGroups,
@@ -333,4 +374,5 @@ export {
   transferGroupOwnership,
   getMyMemberships,
   deleteGroup,
+  leaveGroup,
 };

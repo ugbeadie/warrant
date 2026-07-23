@@ -84,6 +84,7 @@ export interface Grant {
   role?: Role;
   user?: { id: string; username: string } | null;
   group?: { id: string; name: string } | null;
+  viaGroupName?: string;
 }
 
 export interface PolicyRule {

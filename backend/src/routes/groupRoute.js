@@ -9,6 +9,7 @@ import {
   transferGroupOwnership,
   getMyMemberships,
   deleteGroup,
+  leaveGroup,
 } from "../controllers/groupController.js";
 import { protect } from "../middlewares/authMiddleware.js";
 
@@ -23,5 +24,6 @@ router.post("/:id/add-member", protect, addMember);
 router.post("/:id/remove-member", protect, removeMember);
 router.post("/:id/transfer", protect, transferGroupOwnership);
 router.delete("/:id", protect, deleteGroup);
+router.post("/:id/leave", protect, leaveGroup);
 
 export default router;

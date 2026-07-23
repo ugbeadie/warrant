@@ -306,6 +306,54 @@ const deleteResource = async (req, res) => {
   }
 };
 
+const getMyGroupGrants = async (req, res) => {
+  try {
+    const now = new Date();
+
+    const activeMemberships = await prisma.groupMember.findMany({
+      where: {
+        userId: req.user.id,
+        status: "ACTIVE",
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
+      select: { groupId: true, group: { select: { id: true, name: true } } },
+    });
+
+    if (activeMemberships.length === 0) {
+      return res.status(200).json({ grants: [] });
+    }
+
+    const groupIds = activeMemberships.map((m) => m.groupId);
+    const groupNameById = new Map(
+      activeMemberships.map((m) => [m.groupId, m.group.name]),
+    );
+
+    const groupGrants = await prisma.grant.findMany({
+      where: {
+        subjectType: "GROUP",
+        groupId: { in: groupIds },
+        status: "ACTIVE",
+        expiresAt: { gt: now },
+      },
+      include: {
+        resource: { select: { id: true, name: true } },
+        role: true,
+      },
+      orderBy: { expiresAt: "asc" },
+    });
+
+    const grants = groupGrants.map((g) => ({
+      ...g,
+      viaGroupName: groupNameById.get(g.groupId) ?? "Unknown group",
+    }));
+
+    res.status(200).json({ grants });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 export {
   createResource,
   getResources,
@@ -316,4 +364,5 @@ export {
   attemptResourceAccess,
   updateResource,
   deleteResource,
+  getMyGroupGrants,
 };

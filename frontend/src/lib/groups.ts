@@ -54,3 +54,7 @@ export const transferGroupOwnership = async (
   });
   return data.group;
 };
+
+export const leaveGroup = async (groupId: string): Promise<void> => {
+  await api.post(`/groups/${groupId}/leave`);
+};
