@@ -30,7 +30,6 @@ export interface Resource {
 export interface Group {
   id: string;
   name: string;
-  isDepartment: boolean;
   ownerId: string;
   createdAt: string;
   owner: User;
@@ -65,6 +64,8 @@ export interface AccessRequest {
   approver: User | null;
   grant?: Grant | null;
   meetsRequiredRole?: boolean;
+  onBehalfOfGroupId?: string | null;
+  onBehalfOfGroup?: { id: string; name: string } | null;
 }
 
 export interface Grant {

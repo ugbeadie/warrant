@@ -9,6 +9,7 @@ import accessRequestRoute from "./routes/accessRequestRoute.js";
 import policyRuleRoute from "./routes/policyRuleRoute.js";
 import grantRoute from "./routes/grantRoute.js";
 import notificationRoute from "./routes/notificationRoute.js";
+import userRoute from "./routes/userRoute.js";
 import startExpiryJob from "./jobs/expiryJob.js";
 import startUnusedAccessJob from "./jobs/unusedAccessJob.js";
 import auditLogRoute from "./routes/auditLogRoute.js";
@@ -44,6 +45,7 @@ app.use("/api/policy-rules", policyRuleRoute);
 app.use("/api/grants", grantRoute);
 app.use("/api/notifications", notificationRoute);
 app.use("/api/audit-log", auditLogRoute);
+app.use("/api/users", userRoute);
 
 const startServer = async () => {
   try {

@@ -10,6 +10,7 @@ const REQUEST_INCLUDE = {
   },
   requestedRole: true,
   approver: { select: { id: true, username: true } },
+  onBehalfOfGroup: { select: { id: true, name: true } },
   grant: true,
 };
 
@@ -33,15 +34,11 @@ const evaluateAutoApproval = async (
   });
 
   for (const rule of rules) {
-    if (requestedRole.rank > rule.maxRole.rank) {
-      continue;
-    }
+    if (requestedRole.rank > rule.maxRole.rank) continue;
 
     const condition = rule.condition || {};
-
-    if (condition.maxDuration && durationMinutes > condition.maxDuration) {
+    if (condition.maxDuration && durationMinutes > condition.maxDuration)
       continue;
-    }
 
     return rule;
   }
@@ -49,10 +46,14 @@ const evaluateAutoApproval = async (
   return null;
 };
 
+// Blocks a new request if the same subject (user OR group, depending on
+// whether this is an on-behalf-of-group request) already has a pending
+// request, or an active grant that's sufficient / for the same role.
 const findBlockingRequest = async (
   requesterId,
   resourceId,
   requestedRoleId,
+  onBehalfOfGroupId,
 ) => {
   const now = new Date();
 
@@ -63,10 +64,14 @@ const findBlockingRequest = async (
 
   if (!resource) return null;
 
+  const subjectFilter = onBehalfOfGroupId
+    ? { onBehalfOfGroupId }
+    : { requesterId, onBehalfOfGroupId: null };
+
   const candidates = await prisma.accessRequest.findMany({
     where: {
-      requesterId,
       resourceId,
+      ...subjectFilter,
       status: { in: ["PENDING", "APPROVED"] },
     },
     include: REQUEST_INCLUDE,
@@ -87,7 +92,6 @@ const findBlockingRequest = async (
       const grantRole = await prisma.role.findUnique({
         where: { id: candidate.grant.roleId },
       });
-
       if (!grantRole) continue;
 
       const isSufficient = grantRole.rank >= resource.requiredRole.rank;
@@ -102,8 +106,10 @@ const findBlockingRequest = async (
   return null;
 };
 
+// Revokes redundant lower-or-equal-ranked active grants for the same
+// subject (user or group) on the same resource, in favor of a new one.
 const supersedeLowerGrants = async (
-  userId,
+  { subjectType, userId, groupId },
   resourceId,
   newGrantRoleId,
   newGrantId,
@@ -112,11 +118,15 @@ const supersedeLowerGrants = async (
     where: { id: newGrantRoleId },
   });
 
+  const subjectFilter =
+    subjectType === "GROUP"
+      ? { subjectType: "GROUP", groupId }
+      : { subjectType: "USER", userId };
+
   const lowerGrants = await prisma.grant.findMany({
     where: {
       resourceId,
-      subjectType: "USER",
-      userId,
+      ...subjectFilter,
       status: "ACTIVE",
       id: { not: newGrantId },
     },
@@ -132,7 +142,7 @@ const supersedeLowerGrants = async (
 
       await prisma.auditLog.create({
         data: {
-          actorId: userId,
+          actorId: userId ?? null,
           action: "GRANT_SUPERSEDED",
           resourceId,
           detail: {
@@ -149,7 +159,8 @@ const supersedeLowerGrants = async (
 
 const createAccessRequest = async (req, res) => {
   try {
-    const { resourceId, requestedRoleName, reason, durationMinutes } = req.body;
+    const { resourceId, requestedRoleName, reason, durationMinutes, groupId } =
+      req.body;
 
     if (!resourceId || !requestedRoleName || !reason || !durationMinutes) {
       return res.status(400).json({ message: "All fields are required" });
@@ -172,20 +183,43 @@ const createAccessRequest = async (req, res) => {
       return res.status(400).json({ message: "Invalid role name" });
     }
 
-    const isOwnerRequest = resource.ownerId === req.user.id;
+    let onBehalfOfGroupId = null;
+
+    if (groupId) {
+      const group = await prisma.group.findUnique({ where: { id: groupId } });
+
+      if (!group) {
+        return res.status(404).json({ message: "Group not found" });
+      }
+
+      if (group.ownerId !== req.user.id) {
+        return res
+          .status(403)
+          .json({
+            message:
+              "Only the group owner can request access on behalf of this group",
+          });
+      }
+
+      onBehalfOfGroupId = group.id;
+    }
+
+    const isOwnerRequest =
+      !onBehalfOfGroupId && resource.ownerId === req.user.id;
 
     if (!isOwnerRequest) {
       const blocking = await findBlockingRequest(
         req.user.id,
         resourceId,
         requestedRole.id,
+        onBehalfOfGroupId,
       );
       if (blocking) {
         return res.status(400).json({
           message:
             blocking.status === "PENDING"
-              ? "You already have a pending request for this resource"
-              : "You already have active access to this resource",
+              ? "There is already a pending request for this resource"
+              : "This subject already has active access to this resource",
           request: blocking,
         });
       }
@@ -209,6 +243,7 @@ const createAccessRequest = async (req, res) => {
         requestedRoleId: requestedRole.id,
         reason,
         durationMinutes,
+        onBehalfOfGroupId,
         status: autoApprove ? "APPROVED" : "PENDING",
         decidedAt: autoApprove ? new Date() : null,
         approverId: isOwnerRequest ? req.user.id : undefined,
@@ -218,24 +253,45 @@ const createAccessRequest = async (req, res) => {
 
     let grant = null;
 
-    if (isOwnerRequest) {
-      grant = await prisma.grant.create({
-        data: {
-          requestId: accessRequest.id,
-          subjectType: "USER",
-          userId: req.user.id,
-          resourceId,
-          roleId: requestedRole.id,
-          expiresAt: new Date(Date.now() + durationMinutes * 60 * 1000),
-        },
-      });
+    const createGrantForRequest = async () => {
+      const data = onBehalfOfGroupId
+        ? {
+            requestId: accessRequest.id,
+            subjectType: "GROUP",
+            groupId: onBehalfOfGroupId,
+            resourceId,
+            roleId: requestedRole.id,
+            expiresAt: new Date(Date.now() + durationMinutes * 60 * 1000),
+          }
+        : {
+            requestId: accessRequest.id,
+            subjectType: "USER",
+            userId: req.user.id,
+            resourceId,
+            roleId: requestedRole.id,
+            expiresAt: new Date(Date.now() + durationMinutes * 60 * 1000),
+          };
+
+      const newGrant = await prisma.grant.create({ data });
 
       await supersedeLowerGrants(
-        req.user.id,
+        onBehalfOfGroupId
+          ? {
+              subjectType: "GROUP",
+              groupId: onBehalfOfGroupId,
+              userId: req.user.id,
+            }
+          : { subjectType: "USER", userId: req.user.id },
         resourceId,
         requestedRole.id,
-        grant.id,
+        newGrant.id,
       );
+
+      return newGrant;
+    };
+
+    if (isOwnerRequest) {
+      grant = await createGrantForRequest();
 
       await prisma.auditLog.create({
         data: {
@@ -251,23 +307,7 @@ const createAccessRequest = async (req, res) => {
         },
       });
     } else if (matchingRule) {
-      grant = await prisma.grant.create({
-        data: {
-          requestId: accessRequest.id,
-          subjectType: "USER",
-          userId: req.user.id,
-          resourceId,
-          roleId: requestedRole.id,
-          expiresAt: new Date(Date.now() + durationMinutes * 60 * 1000),
-        },
-      });
-
-      await supersedeLowerGrants(
-        req.user.id,
-        resourceId,
-        requestedRole.id,
-        grant.id,
-      );
+      grant = await createGrantForRequest();
     } else {
       const resourceWithOwner = await prisma.resource.findUnique({
         where: { id: resourceId },
@@ -278,7 +318,9 @@ const createAccessRequest = async (req, res) => {
         data: {
           userId: resourceWithOwner.owner.id,
           type: "REQUEST_PENDING_APPROVAL",
-          message: `New access request from ${req.user.username} for "${resource.name}" needs your approval.`,
+          message: onBehalfOfGroupId
+            ? `New access request from ${req.user.username} on behalf of a group for "${resource.name}" needs your approval.`
+            : `New access request from ${req.user.username} for "${resource.name}" needs your approval.`,
         },
       });
     }
@@ -301,8 +343,14 @@ const createAccessRequest = async (req, res) => {
 const getMyRequestForResource = async (req, res) => {
   try {
     const { resourceId } = req.params;
+    const { groupId } = req.query;
 
-    const request = await findBlockingRequest(req.user.id, resourceId);
+    const request = await findBlockingRequest(
+      req.user.id,
+      resourceId,
+      null,
+      groupId || null,
+    );
 
     res.status(200).json({ request });
   } catch (error) {
@@ -314,12 +362,9 @@ const getMyRequestForResource = async (req, res) => {
 const getPendingRequestsForOwner = async (req, res) => {
   try {
     const requests = await prisma.accessRequest.findMany({
-      where: {
-        status: "PENDING",
-        resource: { ownerId: req.user.id },
-      },
+      where: { status: "PENDING", resource: { ownerId: req.user.id } },
       include: REQUEST_INCLUDE,
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: "asc" },
     });
 
     res.status(200).json({ requests });
@@ -334,7 +379,7 @@ const getAllPendingRequests = async (req, res) => {
     const requests = await prisma.accessRequest.findMany({
       where: { status: "PENDING" },
       include: REQUEST_INCLUDE,
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: "asc" },
     });
 
     res.status(200).json({ requests });
@@ -373,9 +418,11 @@ const decideRequest = async (req, res) => {
     const isAdmin = req.user.role === "ADMIN";
 
     if (!isOwner && !isAdmin) {
-      return res.status(403).json({
-        message: "Only the resource owner or admin can decide this request",
-      });
+      return res
+        .status(403)
+        .json({
+          message: "Only the resource owner or admin can decide this request",
+        });
     }
 
     if (accessRequest.requesterId === req.user.id) {
@@ -397,32 +444,51 @@ const decideRequest = async (req, res) => {
     let grant = null;
 
     if (decision === "APPROVED") {
-      grant = await prisma.grant.create({
-        data: {
-          requestId: accessRequest.id,
-          subjectType: "USER",
-          userId: accessRequest.requesterId,
-          resourceId: accessRequest.resourceId,
-          roleId: accessRequest.requestedRoleId,
-          expiresAt: new Date(
-            Date.now() + accessRequest.durationMinutes * 60 * 1000,
-          ),
-        },
-      });
+      const data = updatedRequest.onBehalfOfGroupId
+        ? {
+            requestId: accessRequest.id,
+            subjectType: "GROUP",
+            groupId: updatedRequest.onBehalfOfGroupId,
+            resourceId: accessRequest.resourceId,
+            roleId: accessRequest.requestedRoleId,
+            expiresAt: new Date(
+              Date.now() + accessRequest.durationMinutes * 60 * 1000,
+            ),
+          }
+        : {
+            requestId: accessRequest.id,
+            subjectType: "USER",
+            userId: accessRequest.requesterId,
+            resourceId: accessRequest.resourceId,
+            roleId: accessRequest.requestedRoleId,
+            expiresAt: new Date(
+              Date.now() + accessRequest.durationMinutes * 60 * 1000,
+            ),
+          };
+
+      grant = await prisma.grant.create({ data });
 
       await supersedeLowerGrants(
-        accessRequest.requesterId,
+        updatedRequest.onBehalfOfGroupId
+          ? {
+              subjectType: "GROUP",
+              groupId: updatedRequest.onBehalfOfGroupId,
+              userId: accessRequest.requesterId,
+            }
+          : { subjectType: "USER", userId: accessRequest.requesterId },
         accessRequest.resourceId,
         accessRequest.requestedRoleId,
         grant.id,
       );
     }
 
-    res.status(200).json({
-      message: `Request ${decision.toLowerCase()}`,
-      request: updatedRequest,
-      grant,
-    });
+    res
+      .status(200)
+      .json({
+        message: `Request ${decision.toLowerCase()}`,
+        request: updatedRequest,
+        grant,
+      });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal server error" });

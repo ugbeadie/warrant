@@ -55,15 +55,15 @@ model User {
 }
 
 model Group {
-  id           String   @id @default(uuid())
-  name         String   @unique
-  isDepartment Boolean  @default(false)
-  owner        User     @relation("GroupOwner", fields: [ownerId], references: [id])
-  ownerId      String
-  createdAt    DateTime @default(now())
+  id        String   @id @default(uuid())
+  name      String   @unique
+  owner     User     @relation("GroupOwner", fields: [ownerId], references: [id])
+  ownerId   String
+  createdAt DateTime @default(now())
 
-  members GroupMember[]
-  grants  Grant[]       @relation("GrantGroup")
+  members  GroupMember[]
+  grants   Grant[]         @relation("GrantGroup")
+  requests AccessRequest[] @relation("OnBehalfOfGroup")
 }
 
 model Grant {
@@ -89,7 +89,7 @@ model Grant {
 
 model GroupMember {
   id        String           @id @default(uuid())
-  group     Group            @relation(fields: [groupId], references: [id])
+  group     Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
   groupId   String
   user      User             @relation(fields: [userId], references: [id])
   userId    String
@@ -141,6 +141,9 @@ model AccessRequest {
   approverId      String?
   decidedAt       DateTime?
   createdAt       DateTime      @default(now())
+
+  onBehalfOfGroup   Group?  @relation("OnBehalfOfGroup", fields: [onBehalfOfGroupId], references: [id])
+  onBehalfOfGroupId String?
 
   grant Grant?
 }

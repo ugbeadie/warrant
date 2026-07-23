@@ -9,6 +9,7 @@ import ResourcesPage from "./pages/ResourcesPage";
 import MyAccessPage from "./pages/MyAccessPage";
 import ApprovalsPage from "./pages/ApprovalsPage";
 import GroupsPage from "./pages/GroupsPage";
+import GroupDetailPage from "./pages/GroupDetailPage";
 import AuditLogPage from "./pages/AuditLogPage";
 import AdminPage from "./pages/AdminPage";
 import type { ReactNode } from "react";
@@ -100,6 +101,14 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <GroupsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/groups/:id"
+        element={
+          <ProtectedRoute>
+            <GroupDetailPage />
           </ProtectedRoute>
         }
       />

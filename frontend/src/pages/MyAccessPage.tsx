@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Key } from "lucide-react";
+import { Key, Users } from "lucide-react";
 import { fetchMyGrants, surrenderGrant } from "../lib/resources";
 import { AppLayout } from "../components/AppLayout";
 import { SkeletonRow } from "../components/SkeletonRow";
-import type { Grant } from "../types";
+import type { Grant, GroupMember } from "../types";
+import { fetchMyMemberships } from "../lib/groups";
 
 const ROLE_BADGE_STYLES: Record<string, string> = {
   admin: "bg-danger/15 text-danger",
@@ -43,10 +44,14 @@ const MyAccessPage = () => {
   const [actingId, setActingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [memberships, setMemberships] = useState<GroupMember[]>([]);
 
   useEffect(() => {
-    fetchMyGrants()
-      .then(setGrants)
+    Promise.all([fetchMyGrants(), fetchMyMemberships()])
+      .then(([grantsData, membershipsData]) => {
+        setGrants(grantsData);
+        setMemberships(membershipsData);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -196,6 +201,50 @@ const MyAccessPage = () => {
                 </tbody>
               </table>
             </div>
+          )}
+        </div>
+        <div className="mt-6 rounded-xl border border-border-dark bg-surface-raised overflow-hidden">
+          <div className="flex items-center gap-2 px-5 py-4 border-b border-border-dark">
+            <Users className="w-4 h-4 text-on-dark-muted" />
+            <p className="text-xs font-mono uppercase tracking-widest text-on-dark-muted">
+              Group_Memberships
+            </p>
+          </div>
+
+          {loading ? (
+            <SkeletonRow />
+          ) : memberships.length === 0 ? (
+            <p className="px-5 py-8 text-center text-sm text-on-dark-muted">
+              You're not in any groups yet.
+            </p>
+          ) : (
+            memberships.map((m) => (
+              <div
+                key={m.id}
+                className="flex items-center justify-between px-5 py-4 border-b border-border-dark last:border-0"
+              >
+                <div>
+                  <p className="text-sm font-medium text-on-dark">
+                    {m.group?.name}
+                  </p>
+                  <p className="mt-1 text-xs text-on-dark-muted">
+                    ·{" "}
+                    {m.status === "ACTIVE"
+                      ? expiresLabel(m.expiresAt)
+                      : m.status.toLowerCase()}
+                  </p>
+                </div>
+                <span
+                  className={`rounded px-2 py-0.5 text-[10px] font-mono uppercase tracking-wide ${
+                    m.status === "ACTIVE"
+                      ? "bg-success/15 text-success"
+                      : "bg-neutral/15 text-neutral"
+                  }`}
+                >
+                  {m.status}
+                </span>
+              </div>
+            ))
           )}
         </div>
       </div>

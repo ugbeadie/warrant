@@ -35,6 +35,7 @@ export const createAccessRequest = async (payload: {
   requestedRoleName: string;
   reason: string;
   durationMinutes: number;
+  groupId?: string | null;
 }): Promise<{
   request: AccessRequest;
   grant: unknown | null;

@@ -10,26 +10,26 @@ const GROUP_INCLUDE = {
 
 const createGroup = async (req, res) => {
   try {
-    const { name, isDepartment } = req.body;
+    const { name } = req.body;
 
     if (!name) {
       return res.status(400).json({ message: "name is required" });
     }
 
-    const wantsDepartment = !!isDepartment;
-    const isAdmin = req.user.role === "ADMIN";
-
-    if (wantsDepartment && !isAdmin) {
-      return res
-        .status(403)
-        .json({ message: "Only an admin can create a department" });
-    }
+    const OWNER_MEMBERSHIP_MINUTES = 10 * 365 * 24 * 60; // ~10 years
 
     const group = await prisma.group.create({
       data: {
         name,
-        isDepartment: wantsDepartment,
         ownerId: req.user.id,
+        members: {
+          create: {
+            userId: req.user.id,
+            expiresAt: new Date(
+              Date.now() + OWNER_MEMBERSHIP_MINUTES * 60 * 1000,
+            ),
+          },
+        },
       },
       include: GROUP_INCLUDE,
     });
@@ -44,6 +44,21 @@ const createGroup = async (req, res) => {
 const getGroups = async (req, res) => {
   try {
     const groups = await prisma.group.findMany({
+      include: GROUP_INCLUDE,
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.status(200).json({ groups });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const getMyOwnedGroups = async (req, res) => {
+  try {
+    const groups = await prisma.group.findMany({
+      where: { ownerId: req.user.id },
       include: GROUP_INCLUDE,
       orderBy: { createdAt: "desc" },
     });
@@ -111,11 +126,7 @@ const addMember = async (req, res) => {
     const membership = await prisma.groupMember.upsert({
       where: { groupId_userId: { groupId: req.params.id, userId } },
       update: { expiresAt, status: "ACTIVE" },
-      create: {
-        groupId: req.params.id,
-        userId,
-        expiresAt,
-      },
+      create: { groupId: req.params.id, userId, expiresAt },
     });
 
     res.status(200).json({ message: "Member added successfully", membership });
@@ -211,11 +222,69 @@ const transferGroupOwnership = async (req, res) => {
   }
 };
 
+const getMyMemberships = async (req, res) => {
+  try {
+    const memberships = await prisma.groupMember.findMany({
+      where: { userId: req.user.id },
+      include: { group: { select: { id: true, name: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.status(200).json({ memberships });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const deleteGroup = async (req, res) => {
+  try {
+    const group = await prisma.group.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    const isOwner = group.ownerId === req.user.id;
+    const isAdmin = req.user.role === "ADMIN";
+
+    if (!isOwner && !isAdmin) {
+      return res
+        .status(403)
+        .json({
+          message: "Only the group owner or admin can delete this group",
+        });
+    }
+
+    const activeGrants = await prisma.grant.count({
+      where: { groupId: req.params.id, subjectType: "GROUP", status: "ACTIVE" },
+    });
+
+    if (activeGrants > 0) {
+      return res.status(400).json({
+        message: `Cannot delete this group — it has ${activeGrants} active resource grant(s). Revoke them first.`,
+      });
+    }
+
+    await prisma.group.delete({ where: { id: req.params.id } });
+
+    res.status(200).json({ message: "Group deleted successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 export {
   createGroup,
   getGroups,
+  getMyOwnedGroups,
   getGroupById,
   addMember,
   removeMember,
   transferGroupOwnership,
+  getMyMemberships,
+  deleteGroup,
 };

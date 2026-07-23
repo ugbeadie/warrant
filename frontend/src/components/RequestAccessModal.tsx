@@ -2,7 +2,9 @@ import { useState, useEffect, useMemo } from "react";
 import { X } from "lucide-react";
 import { createAccessRequest } from "../lib/requests";
 import { fetchPolicyRulesForResource } from "../lib/resources";
-import type { Resource } from "../types";
+import { fetchMyOwnedGroups } from "../lib/groups";
+import { useAuth } from "../context/AuthContext";
+import type { Resource, Group } from "../types";
 
 const DURATION_OPTIONS = [
   { label: "1 Hour", minutes: 60 },
@@ -12,7 +14,6 @@ const DURATION_OPTIONS = [
   { label: "Custom", minutes: -1 },
 ];
 
-// Keep in sync with your seeded Role.rank values.
 const ROLE_RANKS: Record<string, number> = {
   viewer: 1,
   editor: 2,
@@ -32,6 +33,7 @@ export const RequestAccessModal = ({
   onClose,
   onSubmitted,
 }: RequestAccessModalProps) => {
+  const { user } = useAuth();
   const [requestedRoleName, setRequestedRoleName] = useState("viewer");
   const [durationChoice, setDurationChoice] = useState(60);
   const [customValue, setCustomValue] = useState(2);
@@ -45,7 +47,11 @@ export const RequestAccessModal = ({
   const [belowRequiredRole, setBelowRequiredRole] = useState(false);
   const [checkingPolicy, setCheckingPolicy] = useState(true);
 
+  const [ownedGroups, setOwnedGroups] = useState<Group[]>([]);
+  const [onBehalfOfGroupId, setOnBehalfOfGroupId] = useState("");
+
   const isCustom = durationChoice === -1;
+  const requestingAsGroup = !!onBehalfOfGroupId;
 
   const durationMinutes = useMemo(() => {
     if (!isCustom) return durationChoice;
@@ -53,6 +59,16 @@ export const RequestAccessModal = ({
       customUnit === "minutes" ? 1 : customUnit === "hours" ? 60 : 1440;
     return Math.max(1, Math.round(customValue * multiplier));
   }, [isCustom, durationChoice, customValue, customUnit]);
+
+  useEffect(() => {
+    if (isOwner || !user) return;
+
+    fetchMyOwnedGroups()
+      .then((groups) =>
+        setOwnedGroups(groups.filter((g) => g.ownerId === user.id)),
+      )
+      .catch(() => setOwnedGroups([]));
+  }, [isOwner, user]);
 
   useEffect(() => {
     if (isOwner) return;
@@ -75,14 +91,11 @@ export const RequestAccessModal = ({
       .then((rules) => {
         const match = rules.some((r) => {
           if (!r.autoApprove) return false;
-
           if (
             r.condition.maxDuration &&
             durationMinutes > r.condition.maxDuration
-          ) {
+          )
             return false;
-          }
-
           const maxRank = r.maxRole?.rank ?? -1;
           return requestedRank <= maxRank;
         });
@@ -115,6 +128,7 @@ export const RequestAccessModal = ({
         requestedRoleName,
         reason,
         durationMinutes,
+        groupId: onBehalfOfGroupId || null,
       });
       onSubmitted();
     } catch (err: any) {
@@ -148,6 +162,32 @@ export const RequestAccessModal = ({
               {resource.name}
             </div>
           </div>
+
+          {!isOwner && ownedGroups.length > 0 && (
+            <div>
+              <label className="block text-[11px] font-mono uppercase tracking-widest text-on-dark-muted mb-1.5">
+                Requesting As
+              </label>
+              <select
+                value={onBehalfOfGroupId}
+                onChange={(e) => setOnBehalfOfGroupId(e.target.value)}
+                className="w-full rounded-md border border-border-dark bg-bg px-3 py-2.5 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+              >
+                <option value="">Myself</option>
+                {ownedGroups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name} (group)
+                  </option>
+                ))}
+              </select>
+              {requestingAsGroup && (
+                <p className="mt-1.5 text-[11px] font-mono text-on-dark-muted">
+                  Access will be granted to every current and future member of
+                  this group, not just you.
+                </p>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="block text-[11px] font-mono uppercase tracking-widest text-on-dark-muted mb-1.5">
