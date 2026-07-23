@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Key, Users } from "lucide-react";
+import { Key, Users, Shield } from "lucide-react";
 import { fetchMyGrants, surrenderGrant } from "../lib/resources";
 import { AppLayout } from "../components/AppLayout";
 import { SkeletonRow } from "../components/SkeletonRow";
-import type { Grant, GroupMember } from "../types";
-import { fetchMyMemberships } from "../lib/groups";
+import type { Grant, GroupMember, Group } from "../types";
+import { fetchMyMemberships, fetchMyOwnedGroups } from "../lib/groups";
 
 const ROLE_BADGE_STYLES: Record<string, string> = {
   admin: "bg-danger/15 text-danger",
@@ -20,7 +20,8 @@ const STATUS_BADGE_STYLES: Record<string, string> = {
   SURRENDERED: "bg-neutral/15 text-neutral",
 };
 
-const expiresLabel = (expiresAt: string) => {
+const expiresLabel = (expiresAt: string | null) => {
+  if (!expiresAt) return "Never";
   const diff = new Date(expiresAt).getTime() - Date.now();
   if (diff <= 0) return "Expired";
   const mins = Math.round(diff / 60000);
@@ -40,17 +41,19 @@ const isUnused = (grant: Grant) => {
 
 const MyAccessPage = () => {
   const [grants, setGrants] = useState<Grant[]>([]);
+  const [memberships, setMemberships] = useState<GroupMember[]>([]);
+  const [ownedGroups, setOwnedGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [actingId, setActingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [memberships, setMemberships] = useState<GroupMember[]>([]);
 
   useEffect(() => {
-    Promise.all([fetchMyGrants(), fetchMyMemberships()])
-      .then(([grantsData, membershipsData]) => {
+    Promise.all([fetchMyGrants(), fetchMyMemberships(), fetchMyOwnedGroups()])
+      .then(([grantsData, membershipsData, ownedData]) => {
         setGrants(grantsData);
         setMemberships(membershipsData);
+        setOwnedGroups(ownedData);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -203,6 +206,7 @@ const MyAccessPage = () => {
             </div>
           )}
         </div>
+
         <div className="mt-6 rounded-xl border border-border-dark bg-surface-raised overflow-hidden">
           <div className="flex items-center gap-2 px-5 py-4 border-b border-border-dark">
             <Users className="w-4 h-4 text-on-dark-muted" />
@@ -243,6 +247,44 @@ const MyAccessPage = () => {
                 >
                   {m.status}
                 </span>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="mt-6 rounded-xl border border-border-dark bg-surface-raised overflow-hidden">
+          <div className="flex items-center gap-2 px-5 py-4 border-b border-border-dark">
+            <Shield className="w-4 h-4 text-on-dark-muted" />
+            <p className="text-xs font-mono uppercase tracking-widest text-on-dark-muted">
+              Groups_You_Own
+            </p>
+          </div>
+
+          {loading ? (
+            <SkeletonRow />
+          ) : ownedGroups.length === 0 ? (
+            <p className="px-5 py-8 text-center text-sm text-on-dark-muted">
+              You don't own any groups yet.
+            </p>
+          ) : (
+            ownedGroups.map((g) => (
+              <div
+                key={g.id}
+                className="flex items-center justify-between px-5 py-4 border-b border-border-dark last:border-0"
+              >
+                <div>
+                  <p className="text-sm font-medium text-on-dark">{g.name}</p>
+                  <p className="mt-1 text-xs text-on-dark-muted">
+                    {g.members?.length ?? 0} member
+                    {g.members?.length === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <Link
+                  to={`/groups/${g.id}`}
+                  className="rounded-md border border-brand/30 px-3 py-1.5 text-xs font-mono uppercase tracking-wide text-brand hover:bg-brand/10 transition"
+                >
+                  Manage
+                </Link>
               </div>
             ))
           )}

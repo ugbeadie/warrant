@@ -16,8 +16,6 @@ const createGroup = async (req, res) => {
       return res.status(400).json({ message: "name is required" });
     }
 
-    const OWNER_MEMBERSHIP_MINUTES = 10 * 365 * 24 * 60; // ~10 years
-
     const group = await prisma.group.create({
       data: {
         name,
@@ -25,9 +23,7 @@ const createGroup = async (req, res) => {
         members: {
           create: {
             userId: req.user.id,
-            expiresAt: new Date(
-              Date.now() + OWNER_MEMBERSHIP_MINUTES * 60 * 1000,
-            ),
+            expiresAt: null,
           },
         },
       },
@@ -106,13 +102,10 @@ const addMember = async (req, res) => {
       return res.status(404).json({ message: "Group not found" });
     }
 
-    const isOwner = group.ownerId === req.user.id;
-    const isAdmin = req.user.role === "ADMIN";
-
-    if (!isOwner && !isAdmin) {
+    if (group.ownerId !== req.user.id) {
       return res
         .status(403)
-        .json({ message: "Only the group owner or admin can add members" });
+        .json({ message: "Only the group owner can add members" });
     }
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -152,13 +145,17 @@ const removeMember = async (req, res) => {
       return res.status(404).json({ message: "Group not found" });
     }
 
-    const isOwner = group.ownerId === req.user.id;
-    const isAdmin = req.user.role === "ADMIN";
-
-    if (!isOwner && !isAdmin) {
+    if (group.ownerId !== req.user.id) {
       return res
         .status(403)
-        .json({ message: "Only the group owner or admin can remove members" });
+        .json({ message: "Only the group owner can remove members" });
+    }
+
+    if (userId === group.ownerId) {
+      return res.status(400).json({
+        message:
+          "The group owner cannot be removed. Transfer ownership first if needed.",
+      });
     }
 
     await prisma.groupMember.updateMany({
@@ -198,6 +195,12 @@ const transferGroupOwnership = async (req, res) => {
       });
     }
 
+    if (newOwnerId === group.ownerId) {
+      return res
+        .status(400)
+        .json({ message: "This user already owns the group" });
+    }
+
     const newOwner = await prisma.user.findUnique({
       where: { id: newOwnerId },
     });
@@ -206,10 +209,55 @@ const transferGroupOwnership = async (req, res) => {
       return res.status(404).json({ message: "New owner not found" });
     }
 
-    const updatedGroup = await prisma.group.update({
-      where: { id: req.params.id },
-      data: { ownerId: newOwnerId },
-      include: GROUP_INCLUDE,
+    const EX_OWNER_MEMBERSHIP_MINUTES = 1440; // 1 days
+
+    const updatedGroup = await prisma.$transaction(async (tx) => {
+      // New owner gets (or upgrades to) a permanent membership.
+      await tx.groupMember.upsert({
+        where: {
+          groupId_userId: { groupId: req.params.id, userId: newOwnerId },
+        },
+        update: { status: "ACTIVE", expiresAt: null },
+        create: {
+          groupId: req.params.id,
+          userId: newOwnerId,
+          expiresAt: null,
+        },
+      });
+
+      // Previous owner is downgraded to a normal, time-boxed member rather
+      // than silently keeping a permanent membership forever.
+      await tx.groupMember.updateMany({
+        where: {
+          groupId: req.params.id,
+          userId: group.ownerId,
+          status: "ACTIVE",
+          expiresAt: null,
+        },
+        data: {
+          expiresAt: new Date(
+            Date.now() + EX_OWNER_MEMBERSHIP_MINUTES * 60 * 1000,
+          ),
+        },
+      });
+
+      return tx.group.update({
+        where: { id: req.params.id },
+        data: { ownerId: newOwnerId },
+        include: GROUP_INCLUDE,
+      });
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.user.id,
+        action: "GROUP_OWNERSHIP_TRANSFERRED",
+        detail: {
+          groupId: req.params.id,
+          previousOwnerId: group.ownerId,
+          newOwnerId,
+        },
+      },
     });
 
     res.status(200).json({
@@ -251,11 +299,9 @@ const deleteGroup = async (req, res) => {
     const isAdmin = req.user.role === "ADMIN";
 
     if (!isOwner && !isAdmin) {
-      return res
-        .status(403)
-        .json({
-          message: "Only the group owner or admin can delete this group",
-        });
+      return res.status(403).json({
+        message: "Only the group owner or admin can delete this group",
+      });
     }
 
     const activeGrants = await prisma.grant.count({

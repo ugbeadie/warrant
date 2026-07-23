@@ -208,7 +208,7 @@ export const RequestAccessModal = ({
                 <span className="font-semibold">
                   {resource.requiredRole.name}
                 </span>{" "}
-                — a lower role will never grant access, even if approved.
+                — a lower role will not grant full access, even if approved.
               </p>
             )}
           </div>
@@ -274,7 +274,7 @@ export const RequestAccessModal = ({
           ) : belowRequiredRole ? (
             <div className="rounded-md border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
               This role does not meet the resource's required level — even if
-              approved, it won't grant access.
+              approved, it won't grant full access.
             </div>
           ) : checkingPolicy ? (
             <div className="rounded-md border border-border-dark bg-bg px-3 py-2 text-xs text-on-dark-muted">

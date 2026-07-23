@@ -44,3 +44,13 @@ export const removeGroupMember = async (
 export const deleteGroup = async (id: string): Promise<void> => {
   await api.delete(`/groups/${id}`);
 };
+
+export const transferGroupOwnership = async (
+  groupId: string,
+  newOwnerId: string,
+): Promise<Group> => {
+  const { data } = await api.post(`/groups/${groupId}/transfer`, {
+    newOwnerId,
+  });
+  return data.group;
+};

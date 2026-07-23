@@ -66,7 +66,7 @@ const checkAccess = async (userId, resourceId) => {
     where: {
       userId,
       status: "ACTIVE",
-      expiresAt: { gt: now },
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
     },
     include: { group: true },
   });

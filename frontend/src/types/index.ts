@@ -40,7 +40,7 @@ export interface GroupMember {
   id: string;
   groupId: string;
   userId: string;
-  expiresAt: string;
+  expiresAt: string | null;
   status: MembershipStatus;
   createdAt: string;
   user: User;

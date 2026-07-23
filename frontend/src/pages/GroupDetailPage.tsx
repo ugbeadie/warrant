@@ -1,27 +1,37 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ChevronRight, Users, UserPlus, X, Search, Trash2 } from "lucide-react";
+import {
+  ChevronRight,
+  Users,
+  UserPlus,
+  X,
+  Search,
+  Trash2,
+  Repeat,
+} from "lucide-react";
 import {
   fetchGroupById,
   addGroupMember,
   removeGroupMember,
   deleteGroup,
+  transferGroupOwnership,
 } from "../lib/groups";
 import { searchUsers, type UserSearchResult } from "../lib/users";
 import { AppLayout } from "../components/AppLayout";
 import { ConfirmDeleteModal } from "../components/ConfirmDeleteModal";
 import { useAuth } from "../context/AuthContext";
 import type { Group } from "../types";
-import { GroupDetailSkeleton } from "../components/GroupDetailSkeleton";
 
 const DURATION_OPTIONS = [
   { label: "1 Day", minutes: 1440 },
   { label: "1 Week", minutes: 10080 },
   { label: "30 Days", minutes: 43200 },
   { label: "90 Days", minutes: 129600 },
+  { label: "Custom", minutes: -1 },
 ];
 
-const expiresLabel = (expiresAt: string) => {
+const expiresLabel = (expiresAt: string | null) => {
+  if (!expiresAt) return "Never";
   const diff = new Date(expiresAt).getTime() - Date.now();
   if (diff <= 0) return "Expired";
   const mins = Math.round(diff / 60000);
@@ -30,6 +40,25 @@ const expiresLabel = (expiresAt: string) => {
   if (hours < 24) return `in ${hours}h`;
   return `in ${Math.round(hours / 24)}d`;
 };
+
+const GroupDetailSkeleton = () => (
+  <div className="animate-pulse">
+    <div className="h-3 w-24 bg-border-dark rounded" />
+    <div className="mt-3 flex items-center justify-between">
+      <div>
+        <div className="h-7 w-48 bg-border-dark rounded" />
+        <div className="mt-2 h-4 w-64 bg-border-dark rounded" />
+      </div>
+      <div className="h-9 w-28 bg-border-dark rounded-md" />
+    </div>
+    <div className="mt-6 rounded-xl border border-border-dark bg-surface-raised overflow-hidden">
+      <div className="h-12 border-b border-border-dark" />
+      <div className="h-14 border-b border-border-dark" />
+      <div className="h-14 border-b border-border-dark" />
+      <div className="h-14" />
+    </div>
+  </div>
+);
 
 const GroupDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -40,6 +69,7 @@ const GroupDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // --- Add Member modal state (owner-only) ---
   const [showAddMember, setShowAddMember] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
@@ -47,20 +77,66 @@ const GroupDetailPage = () => {
   const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(
     null,
   );
-  const [newDuration, setNewDuration] = useState(1440);
+
+  // Which duration preset is picked in the Add_Member form's <select>
+  // (e.g. 1440 for "1 Day", or -1 to reveal the custom value+unit inputs).
+  const [newDurationChoice, setNewDurationChoice] = useState(1440);
+  const [customValue, setCustomValue] = useState(1);
+  const [customUnit, setCustomUnit] = useState<"minutes" | "hours" | "days">(
+    "days",
+  );
+
+  // True while addGroupMember() is in flight — disables the submit button
+  // and swaps its label to "Adding..." so it can't be double-submitted.
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState("");
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // --- Member removal state (owner-only) ---
   const [removingUserId, setRemovingUserId] = useState<string | null>(null);
+  // Tracks which member row's Remove button is currently "armed" (first
+  // click shows Confirm, second click actually removes). null = no row
+  // is in the confirming state.
   const [confirmingUserId, setConfirmingUserId] = useState<string | null>(null);
 
+  // --- Delete group state (owner or admin) ---
   const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
 
+  // --- Transfer ownership state (owner or admin) ---
+  const [showTransfer, setShowTransfer] = useState(false);
+  const [transferQuery, setTransferQuery] = useState("");
+  const [transferResults, setTransferResults] = useState<UserSearchResult[]>(
+    [],
+  );
+  const [transferSearching, setTransferSearching] = useState(false);
+  const [transferTarget, setTransferTarget] = useState<UserSearchResult | null>(
+    null,
+  );
+  const [transferring, setTransferring] = useState(false);
+  const [transferError, setTransferError] = useState("");
+  const [confirmingTransfer, setConfirmingTransfer] = useState(false);
+  const transferDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // True ownership — gates day-to-day membership control (add/remove
+  // members). Admin no longer gets these; see isOwnerOrAdmin below for
+  // the coarser powers (delete, transfer) admin retains.
   const isOwner = group ? group.ownerId === user?.id : false;
+
+  // Owner OR platform admin — used only for the heavier, less frequent
+  // actions (delete group, transfer ownership), mirroring how Resources
+  // separates owner-only grant management from admin-level overrides.
   const isOwnerOrAdmin = isOwner || user?.role === "ADMIN";
+
+  const isCustom = newDurationChoice === -1;
+
+  const newDuration = useMemo(() => {
+    if (!isCustom) return newDurationChoice;
+    const multiplier =
+      customUnit === "minutes" ? 1 : customUnit === "hours" ? 60 : 1440;
+    return Math.max(1, Math.round(customValue * multiplier));
+  }, [isCustom, newDurationChoice, customValue, customUnit]);
 
   const loadGroup = () => {
     if (!id) return;
@@ -73,6 +149,7 @@ const GroupDetailPage = () => {
 
   useEffect(() => {
     loadGroup();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   useEffect(() => {
@@ -96,17 +173,47 @@ const GroupDetailPage = () => {
     };
   }, [searchQuery]);
 
+  useEffect(() => {
+    if (transferDebounce.current) clearTimeout(transferDebounce.current);
+
+    if (transferQuery.trim().length < 2) {
+      setTransferResults([]);
+      return;
+    }
+
+    setTransferSearching(true);
+    transferDebounce.current = setTimeout(() => {
+      searchUsers(transferQuery)
+        .then((results) =>
+          setTransferResults(results.filter((u) => u.id !== group?.ownerId)),
+        )
+        .catch(() => setTransferResults([]))
+        .finally(() => setTransferSearching(false));
+    }, 300);
+
+    return () => {
+      if (transferDebounce.current) clearTimeout(transferDebounce.current);
+    };
+  }, [transferQuery, group?.ownerId]);
+
   const resetAddMemberForm = () => {
     setSearchQuery("");
     setSearchResults([]);
     setSelectedUser(null);
-    setNewDuration(1440);
+    setNewDurationChoice(1440);
+    setCustomValue(1);
+    setCustomUnit("days");
     setAddError("");
   };
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || !selectedUser) return;
+
+    if (isCustom && newDuration < 1) {
+      setAddError("Duration must be at least 1 minute");
+      return;
+    }
 
     setAddError("");
     setAdding(true);
@@ -152,6 +259,38 @@ const GroupDetailPage = () => {
     } catch (err: any) {
       setDeleteError(err.response?.data?.message || "Failed to delete group");
       setDeleting(false);
+    }
+  };
+
+  const resetTransferForm = () => {
+    setTransferQuery("");
+    setTransferResults([]);
+    setTransferTarget(null);
+    setTransferError("");
+    setConfirmingTransfer(false);
+  };
+
+  const handleTransfer = async () => {
+    if (!id || !transferTarget) return;
+
+    if (!confirmingTransfer) {
+      setConfirmingTransfer(true);
+      return;
+    }
+
+    setTransferError("");
+    setTransferring(true);
+    try {
+      await transferGroupOwnership(id, transferTarget.id);
+      resetTransferForm();
+      setShowTransfer(false);
+      loadGroup();
+    } catch (err: any) {
+      setTransferError(
+        err.response?.data?.message || "Failed to transfer ownership",
+      );
+    } finally {
+      setTransferring(false);
     }
   };
 
@@ -201,8 +340,8 @@ const GroupDetailPage = () => {
             </p>
           </div>
 
-          {isOwnerOrAdmin && (
-            <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            {isOwner && (
               <button
                 onClick={() => setShowAddMember(true)}
                 className="flex items-center gap-1.5 rounded-md bg-brand px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-white hover:bg-brand-hover transition"
@@ -210,17 +349,26 @@ const GroupDetailPage = () => {
                 <UserPlus className="w-3.5 h-3.5" />
                 Add_Member
               </button>
-              {isOwner && (
-                <button
-                  onClick={() => setShowConfirmDeleteModal(true)}
-                  className="flex items-center gap-1.5 rounded-md border border-danger/30 px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-danger hover:bg-danger/10 transition"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Delete
-                </button>
-              )}
-            </div>
-          )}
+            )}
+            {isOwner && (
+              <button
+                onClick={() => setShowTransfer(true)}
+                className="flex items-center gap-1.5 rounded-md border border-border-dark px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-on-dark hover:bg-bg transition"
+              >
+                <Repeat className="w-3.5 h-3.5" />
+                Transfer
+              </button>
+            )}
+            {isOwnerOrAdmin && (
+              <button
+                onClick={() => setShowConfirmDeleteModal(true)}
+                className="flex items-center gap-1.5 rounded-md border border-danger/30 px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-danger hover:bg-danger/10 transition"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete
+              </button>
+            )}
+          </div>
         </div>
 
         {error && <p className="mt-3 text-xs text-danger font-mono">{error}</p>}
@@ -271,16 +419,18 @@ const GroupDetailPage = () => {
                       </button>
                     </div>
                   ) : (
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-on-dark-muted" />
-                      <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        autoFocus
-                        placeholder="Search by username or email..."
-                        className="w-full rounded-md border border-border-dark bg-bg pl-9 pr-3 py-2.5 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
-                      />
+                    <>
+                      <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-on-dark-muted" />
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          autoFocus
+                          placeholder="Search by username or email..."
+                          className="w-full rounded-md border border-border-dark bg-bg pl-9 pr-3 py-2.5 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                        />
+                      </div>
 
                       {searchQuery.trim().length >= 2 && (
                         <div className="mt-1.5 rounded-md border border-border-dark bg-bg max-h-48 overflow-y-auto">
@@ -314,7 +464,7 @@ const GroupDetailPage = () => {
                           )}
                         </div>
                       )}
-                    </div>
+                    </>
                   )}
                 </div>
 
@@ -323,16 +473,40 @@ const GroupDetailPage = () => {
                     Duration
                   </label>
                   <select
-                    value={newDuration}
-                    onChange={(e) => setNewDuration(Number(e.target.value))}
+                    value={newDurationChoice}
+                    onChange={(e) =>
+                      setNewDurationChoice(Number(e.target.value))
+                    }
                     className="w-full rounded-md border border-border-dark bg-bg px-3 py-2.5 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                   >
                     {DURATION_OPTIONS.map((opt) => (
-                      <option key={opt.minutes} value={opt.minutes}>
+                      <option key={opt.label} value={opt.minutes}>
                         {opt.label}
                       </option>
                     ))}
                   </select>
+
+                  {isCustom && (
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={customValue}
+                        onChange={(e) => setCustomValue(Number(e.target.value))}
+                        className="w-24 rounded-md border border-border-dark bg-bg px-3 py-2 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                      />
+                      <select
+                        value={customUnit}
+                        onChange={(e) => setCustomUnit(e.target.value as any)}
+                        className="flex-1 rounded-md border border-border-dark bg-bg px-3 py-2 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                      >
+                        <option value="minutes">Minutes</option>
+                        <option value="hours">Hours</option>
+                        <option value="days">Days</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 {addError && (
@@ -363,6 +537,149 @@ const GroupDetailPage = () => {
           </div>
         )}
 
+        {showTransfer && (
+          <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center px-4">
+            <div className="w-full max-w-md rounded-xl border border-border-dark bg-surface-raised">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border-dark">
+                <p className="text-sm font-mono font-semibold uppercase tracking-widest text-on-dark">
+                  Transfer_Ownership
+                </p>
+                <button
+                  onClick={() => {
+                    setShowTransfer(false);
+                    resetTransferForm();
+                  }}
+                  className="text-on-dark-muted hover:text-on-dark transition"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="px-5 py-5 space-y-4">
+                <div>
+                  <label className="block text-[11px] font-mono uppercase tracking-widest text-on-dark-muted mb-1.5">
+                    New Owner
+                  </label>
+
+                  {transferTarget ? (
+                    <div className="flex items-center justify-between rounded-md border border-border-dark bg-bg px-3 py-2.5">
+                      <div>
+                        <p className="text-sm text-on-dark">
+                          {transferTarget.username}
+                        </p>
+                        <p className="text-xs text-on-dark-muted">
+                          {transferTarget.email}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTransferTarget(null);
+                          setTransferQuery("");
+                          setConfirmingTransfer(false);
+                        }}
+                        className="text-xs font-mono uppercase text-on-dark-muted hover:text-on-dark transition"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-on-dark-muted" />
+                        <input
+                          type="text"
+                          value={transferQuery}
+                          onChange={(e) => setTransferQuery(e.target.value)}
+                          autoFocus
+                          placeholder="Search by username or email..."
+                          className="w-full rounded-md border border-border-dark bg-bg pl-9 pr-3 py-2.5 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                        />
+                      </div>
+
+                      {transferQuery.trim().length >= 2 && (
+                        <div className="mt-1.5 rounded-md border border-border-dark bg-bg max-h-48 overflow-y-auto">
+                          {transferSearching ? (
+                            <p className="px-3 py-2.5 text-xs text-on-dark-muted">
+                              Searching...
+                            </p>
+                          ) : transferResults.length === 0 ? (
+                            <p className="px-3 py-2.5 text-xs text-on-dark-muted">
+                              No users found.
+                            </p>
+                          ) : (
+                            transferResults.map((u) => (
+                              <button
+                                type="button"
+                                key={u.id}
+                                onClick={() => {
+                                  setTransferTarget(u);
+                                  setTransferResults([]);
+                                }}
+                                className="w-full text-left px-3 py-2 hover:bg-surface-raised transition"
+                              >
+                                <p className="text-sm text-on-dark">
+                                  {u.username}
+                                </p>
+                                <p className="text-xs text-on-dark-muted">
+                                  {u.email}
+                                </p>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {transferTarget && (
+                  <div className="rounded-md border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
+                    You'll be downgraded to a regular 1-day member.{" "}
+                    {transferTarget.username} becomes the permanent owner and
+                    gains full control of this group.
+                  </div>
+                )}
+
+                {transferError && (
+                  <p className="text-xs text-danger font-mono">
+                    {transferError}
+                  </p>
+                )}
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowTransfer(false);
+                      resetTransferForm();
+                    }}
+                    className="text-xs font-mono uppercase tracking-wide text-on-dark-muted hover:text-on-dark transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleTransfer}
+                    disabled={transferring || !transferTarget}
+                    className={`rounded-md px-5 py-2 text-xs font-mono font-semibold uppercase tracking-wide text-white disabled:opacity-50 transition ${
+                      confirmingTransfer
+                        ? "bg-warning hover:bg-warning/90"
+                        : "bg-brand hover:bg-brand-hover"
+                    }`}
+                  >
+                    {transferring
+                      ? "Transferring..."
+                      : confirmingTransfer
+                        ? "Confirm_Transfer"
+                        : "Transfer_Ownership"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="mt-6 rounded-xl border border-border-dark bg-surface-raised overflow-hidden">
           <div className="flex items-center gap-2 px-5 py-4 border-b border-border-dark">
             <Users className="w-4 h-4 text-on-dark-muted" />
@@ -382,7 +699,7 @@ const GroupDetailPage = () => {
                   <tr className="text-[10px] font-mono uppercase tracking-widest text-on-dark-muted border-b border-border-dark">
                     <th className="text-left font-medium px-5 py-3">User</th>
                     <th className="text-left font-medium px-2 py-3">Expires</th>
-                    {isOwnerOrAdmin && (
+                    {isOwner && (
                       <th className="text-right font-medium px-5 py-3">
                         Actions
                       </th>
@@ -393,6 +710,7 @@ const GroupDetailPage = () => {
                   {group.members.map((m) => {
                     const isConfirming = confirmingUserId === m.userId;
                     const isRemoving = removingUserId === m.userId;
+                    const isMemberOwner = m.userId === group.ownerId;
 
                     return (
                       <tr
@@ -405,29 +723,35 @@ const GroupDetailPage = () => {
                         <td className="px-2 py-3 text-on-dark-muted text-xs whitespace-nowrap">
                           {expiresLabel(m.expiresAt)}
                         </td>
-                        {isOwnerOrAdmin && (
+                        {isOwner && (
                           <td className="px-5 py-3 text-right whitespace-nowrap">
-                            <div className="flex items-center justify-end gap-2">
-                              {isConfirming && !isRemoving && (
+                            {isMemberOwner ? (
+                              <span className="text-[10px] font-mono uppercase text-on-dark-muted">
+                                Owner
+                              </span>
+                            ) : (
+                              <div className="flex items-center justify-end gap-2">
+                                {isConfirming && !isRemoving && (
+                                  <button
+                                    onClick={() => setConfirmingUserId(null)}
+                                    className="text-[10px] font-mono uppercase tracking-wide text-on-dark-muted hover:text-on-dark transition"
+                                  >
+                                    Cancel
+                                  </button>
+                                )}
                                 <button
-                                  onClick={() => setConfirmingUserId(null)}
-                                  className="text-[10px] font-mono uppercase tracking-wide text-on-dark-muted hover:text-on-dark transition"
+                                  onClick={() => handleRemoveMember(m.userId)}
+                                  disabled={isRemoving}
+                                  className="text-xs font-mono uppercase text-danger hover:underline disabled:opacity-50"
                                 >
-                                  Cancel
+                                  {isRemoving
+                                    ? "Removing..."
+                                    : isConfirming
+                                      ? "Confirm"
+                                      : "Remove"}
                                 </button>
-                              )}
-                              <button
-                                onClick={() => handleRemoveMember(m.userId)}
-                                disabled={isRemoving}
-                                className="text-xs font-mono uppercase text-danger hover:underline disabled:opacity-50"
-                              >
-                                {isRemoving
-                                  ? "Removing..."
-                                  : isConfirming
-                                    ? "Confirm"
-                                    : "Remove"}
-                              </button>
-                            </div>
+                              </div>
+                            )}
                           </td>
                         )}
                       </tr>
