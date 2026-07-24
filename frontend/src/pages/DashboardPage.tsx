@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { fetchMyResources } from "../lib/resources";
+import { fetchMyResources, fetchMyGrants } from "../lib/resources";
 import { fetchPendingForOwner } from "../lib/requests";
 import { fetchMyAuditLog, fetchAllAuditLog } from "../lib/auditLog";
 import { AppLayout } from "../components/AppLayout";
@@ -8,7 +8,7 @@ import { SkeletonCard } from "../components/SkeletonCard";
 import { SkeletonRow } from "../components/SkeletonRow";
 import { SummaryCard } from "../components/SummaryCard";
 import { useAuth } from "../context/AuthContext";
-import type { Resource, AccessRequest, AuditLogEntry } from "../types";
+import type { Resource, AccessRequest, AuditLogEntry, Grant } from "../types";
 import { CheckCircle, Key, TriangleAlert } from "lucide-react";
 import { timeAgo } from "../lib/timeAgo";
 
@@ -18,33 +18,147 @@ const ROLE_BADGE_STYLES: Record<string, string> = {
   viewer: "bg-neutral/15 text-neutral",
 };
 
+const DASHBOARD_ACTIVITY_PREVIEW_COUNT = 5;
+
+// Same "unused" definition as MyAccessPage: active, and not touched in 3+ days.
+const isUnused = (grant: Grant) => {
+  if (grant.status !== "ACTIVE") return false;
+  const referenceDate = grant.lastAccessedAt ?? grant.grantedAt;
+  const daysSince =
+    (Date.now() - new Date(referenceDate).getTime()) / (1000 * 60 * 60 * 24);
+  return daysSince > 3;
+};
+
 type ActivityPart = { text: string; emphasize?: boolean };
 
 const ACTION_TEMPLATES: Record<
   string,
   (entry: AuditLogEntry) => ActivityPart[]
 > = {
-  REQUEST_PENDING_APPROVAL: (e) => [
-    { text: `${e.actor?.username} requested access to ` },
-    { text: e.resource?.name ?? "a resource", emphasize: true },
-  ],
-  GRANT_EXPIRED: (e) => [
-    { text: `${e.actor?.username}'s access to ` },
-    { text: e.resource?.name ?? "a resource", emphasize: true },
-    { text: " expired" },
-  ],
-  GROUP_MEMBERSHIP_EXPIRED: (e) => [
-    { text: `${e.actor?.username}'s group membership expired` },
-  ],
-  GRANT_FLAGGED_UNUSED: (e) => [
-    { text: "Access to " },
-    { text: e.resource?.name ?? "a resource", emphasize: true },
-    { text: " was flagged as unused" },
-  ],
-  UNAUTHORIZED_ACCESS_ATTEMPT: (e) => [
-    { text: `${e.actor?.username} was denied access to ` },
-    { text: e.resource?.name ?? "a resource", emphasize: true },
-  ],
+  REQUEST_PENDING_APPROVAL: (e) => {
+    const d = e.detail as Record<string, any> | null;
+    return [
+      {
+        text: `${e.actor?.username} requested ${d?.requestedRoleName ?? ""} access to `,
+      },
+      { text: e.resource?.name ?? "a resource", emphasize: true },
+    ];
+  },
+
+  REQUEST_APPROVED: (e) => {
+    const d = e.detail as Record<string, any> | null;
+    return [
+      {
+        text: `${e.actor?.username} approved ${d?.requesterUsername ?? "a"}'s request for `,
+      },
+      { text: e.resource?.name ?? "a resource", emphasize: true },
+    ];
+  },
+
+  REQUEST_DENIED: (e) => {
+    const d = e.detail as Record<string, any> | null;
+    return [
+      {
+        text: `${e.actor?.username} denied ${d?.requesterUsername ?? "a"}'s request for `,
+      },
+      { text: e.resource?.name ?? "a resource", emphasize: true },
+    ];
+  },
+
+  REQUEST_AUTO_APPROVED: (e) => {
+    return [
+      { text: `${e.actor?.username}'s request for ` },
+      { text: e.resource?.name ?? "a resource", emphasize: true },
+      { text: " was auto-approved by policy" },
+    ];
+  },
+
+  GRANT_REVOKED: (e) => {
+    const d = e.detail as Record<string, any> | null;
+    if (d?.subjectType === "GROUP") {
+      return [
+        {
+          text: `${e.actor?.username} revoked group "${d?.groupName ?? "a group"}"'s access to `,
+        },
+        { text: e.resource?.name ?? "a resource", emphasize: true },
+      ];
+    }
+    const isSelf =
+      d?.subjectUsername && d.subjectUsername === e.actor?.username;
+    return isSelf
+      ? [
+          { text: `${e.actor?.username} revoked their own access to ` },
+          { text: e.resource?.name ?? "a resource", emphasize: true },
+        ]
+      : [
+          {
+            text: `${e.actor?.username} revoked ${d?.subjectUsername ?? "a user"}'s access to `,
+          },
+          { text: e.resource?.name ?? "a resource", emphasize: true },
+        ];
+  },
+
+  GRANT_SURRENDERED: (e) => {
+    const d = e.detail as Record<string, any> | null;
+    return [
+      { text: `${e.actor?.username} surrendered ${d?.role ?? ""} access to ` },
+      { text: e.resource?.name ?? "a resource", emphasize: true },
+    ];
+  },
+
+  GRANT_SUPERSEDED: (e) => {
+    const d = e.detail as Record<string, any> | null;
+    return [
+      { text: `${e.actor?.username}'s ${d?.revokedRole ?? "lower"} grant on ` },
+      { text: e.resource?.name ?? "a resource", emphasize: true },
+      { text: ` was superseded by ${d?.newRole ?? "a higher role"}` },
+    ];
+  },
+
+  GRANT_EXPIRED: (e) => {
+    return [
+      { text: `${e.actor?.username}'s access to ` },
+      { text: e.resource?.name ?? "a resource", emphasize: true },
+      { text: " expired" },
+    ];
+  },
+
+  GROUP_MEMBERSHIP_EXPIRED: (e) => {
+    return [{ text: `${e.actor?.username}'s group membership expired` }];
+  },
+
+  GRANT_FLAGGED_UNUSED: (e) => {
+    return [
+      { text: "Access to " },
+      { text: e.resource?.name ?? "a resource", emphasize: true },
+      { text: " was flagged as unused" },
+    ];
+  },
+
+  UNAUTHORIZED_ACCESS_ATTEMPT: (e) => {
+    return [
+      { text: `${e.actor?.username} was denied access to ` },
+      { text: e.resource?.name ?? "a resource", emphasize: true },
+    ];
+  },
+
+  OWNER_ACCESS_REQUEST_AUTO_APPROVED: (e) => {
+    const d = e.detail as Record<string, any> | null;
+    return [
+      { text: `${e.actor?.username} used their own access to ` },
+      { text: e.resource?.name ?? "a resource", emphasize: true },
+      { text: ` as ${d?.requestedRoleName ?? "owner"}` },
+    ];
+  },
+
+  GROUP_OWNERSHIP_TRANSFERRED: (e) => {
+    const d = e.detail as Record<string, any> | null;
+    return [
+      { text: `${e.actor?.username} transferred ownership of ` },
+      { text: d?.groupName ?? "a group", emphasize: true },
+      { text: ` to ${d?.newOwnerUsername ?? "a user"}` },
+    ];
+  },
 };
 
 const formatActivity = (entry: AuditLogEntry): ActivityPart[] => {
@@ -60,6 +174,7 @@ const formatActivity = (entry: AuditLogEntry): ActivityPart[] => {
 const DashboardPage = () => {
   const { user } = useAuth();
   const [resources, setResources] = useState<Resource[]>([]);
+  const [grants, setGrants] = useState<Grant[]>([]);
   const [pendingRequests, setPendingRequests] = useState<AccessRequest[]>([]);
   const [activity, setActivity] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,14 +187,19 @@ const DashboardPage = () => {
             ? fetchAllAuditLog({ page: 1 })
             : fetchMyAuditLog({ page: 1 });
 
-        const [resourcesData, pendingData, activityData] = await Promise.all([
-          fetchMyResources(),
-          fetchPendingForOwner(),
-          activityPromise,
-        ]);
+        const [resourcesData, grantsData, pendingData, activityData] =
+          await Promise.all([
+            fetchMyResources(),
+            fetchMyGrants(),
+            fetchPendingForOwner(),
+            activityPromise,
+          ]);
         setResources(resourcesData);
+        setGrants(grantsData);
         setPendingRequests(pendingData);
-        setActivity(activityData.entries.slice(0, 5));
+        setActivity(
+          activityData.entries.slice(0, DASHBOARD_ACTIVITY_PREVIEW_COUNT),
+        );
       } finally {
         setLoading(false);
       }
@@ -88,7 +208,8 @@ const DashboardPage = () => {
     load();
   }, [user?.role]);
 
-  const flaggedUnused = resources.filter((r) => (r as any).unused).length;
+  const activeGrants = grants.filter((g) => g.status === "ACTIVE");
+  const flaggedUnusedCount = activeGrants.filter(isUnused).length;
 
   const sortedResources = [...resources].sort((a, b) => {
     const aDate = (a as any).createdAt;
@@ -127,19 +248,21 @@ const DashboardPage = () => {
 
               <SummaryCard
                 label="Active Grants"
-                value={resources.length}
+                value={activeGrants.length}
                 accent="brand"
                 icon={<Key className="w-4 h-4" />}
-                linkTo="/resources"
+                linkTo="/my-access"
                 linkLabel="View my access →"
               />
 
               <SummaryCard
                 label="Flagged Unused"
-                value={flaggedUnused}
+                value={flaggedUnusedCount}
                 accent="danger"
                 icon={<TriangleAlert className="w-4 h-4" />}
-                description={`${flaggedUnused} resource${flaggedUnused === 1 ? "" : "s"} unused`}
+                linkTo="/my-access"
+                linkLabel="Review unused access →"
+                // description={`${flaggedUnusedCount} grant${flaggedUnusedCount === 1 ? "" : "s"} unused 3+ days`}
               />
             </>
           )}

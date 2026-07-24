@@ -57,10 +57,16 @@ const detailFor = (entry: AuditLogEntry) => {
       return `Auto-approved ${d?.requestedRoleName ?? ""} access to ${entry.resource?.name ?? "a resource"} by policy`;
     case "REQUEST_DENIED":
       return `Denied request for ${d?.requesterUsername ?? "a user"}`;
-    case "GRANT_REVOKED":
-      return d?.subjectType === "GROUP"
-        ? `Revoked ${d?.role ?? ""} access from group "${d?.groupName ?? "a group"}"`
+    case "GRANT_REVOKED": {
+      if (d?.subjectType === "GROUP") {
+        return `Revoked ${d?.role ?? ""} access from group "${d?.groupName ?? "a group"}"`;
+      }
+      const isSelf =
+        d?.subjectUsername && d.subjectUsername === entry.actor.username;
+      return isSelf
+        ? `Revoked their own ${d?.role ?? ""} access`
         : `Revoked ${d?.role ?? ""} access from ${d?.subjectUsername ?? "a user"}`;
+    }
     case "GRANT_EXPIRED":
       return `Grant expired on ${entry.resource?.name ?? "a resource"}`;
     case "GROUP_MEMBERSHIP_EXPIRED":
