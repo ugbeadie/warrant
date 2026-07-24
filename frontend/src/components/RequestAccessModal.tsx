@@ -24,7 +24,7 @@ interface RequestAccessModalProps {
   resource: Resource;
   isOwner?: boolean;
   onClose: () => void;
-  onSubmitted: () => void;
+  onSubmitted: (groupId: string | null) => void;
 }
 
 export const RequestAccessModal = ({
@@ -130,7 +130,7 @@ export const RequestAccessModal = ({
         durationMinutes,
         groupId: onBehalfOfGroupId || null,
       });
-      onSubmitted();
+      onSubmitted(onBehalfOfGroupId || null);
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to submit request");
     } finally {

@@ -180,6 +180,11 @@ const ApprovalsPage = () => {
                           <p className="text-sm font-medium text-on-dark">
                             {req.requester.username}
                           </p>
+                          {req.onBehalfOfGroup && (
+                            <p className="mt-0.5 text-[10px] font-mono uppercase tracking-wide text-brand">
+                              on behalf of {req.onBehalfOfGroup.name}
+                            </p>
+                          )}
                           <p className="mt-0.5 text-xs text-on-dark-muted font-mono">
                             {timeAgo(req.createdAt)}
                           </p>

@@ -23,9 +23,10 @@ export const decideRequest = async (
 
 export const fetchMyRequestForResource = async (
   resourceId: string,
+  groupId?: string | null,
 ): Promise<AccessRequest | null> => {
   const { data } = await api
-    .get(`/requests/mine/${resourceId}`)
+    .get(`/requests/mine/${resourceId}`, { params: groupId ? { groupId } : {} })
     .catch(() => ({ data: { request: null } }));
   return data.request;
 };

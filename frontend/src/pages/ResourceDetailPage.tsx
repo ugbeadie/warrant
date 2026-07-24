@@ -69,6 +69,9 @@ const ResourceDetailPage = () => {
   const [actingAction, setActingAction] = useState<"revoke" | "delete" | null>(
     null,
   );
+  const [requestedAsGroupId, setRequestedAsGroupId] = useState<string | null>(
+    null,
+  );
 
   const isOwner = resource ? resource.ownerId === user?.id : false;
 
@@ -90,9 +93,12 @@ const ResourceDetailPage = () => {
 
   const refreshMyRequest = useCallback(async () => {
     if (!id) return;
-    const request = await fetchMyRequestForResource(id).catch(() => null);
+    const request = await fetchMyRequestForResource(
+      id,
+      requestedAsGroupId,
+    ).catch(() => null);
     setMyRequest(request);
-  }, [id]);
+  }, [id, requestedAsGroupId]);
 
   useEffect(() => {
     if (!id) return;
@@ -136,9 +142,7 @@ const ResourceDetailPage = () => {
       setGrants((prev) =>
         prev.map((g) => (g.id === grantId ? { ...g, status: "REVOKED" } : g)),
       );
-      // The revoked grant might be the one backing the current
-      // Access_Trace message (e.g. an admin revoking their own grant) —
-      // refresh it so the panel doesn't show stale access info.
+
       await refreshAccess();
     } finally {
       setActingGrantId(null);
@@ -179,14 +183,19 @@ const ResourceDetailPage = () => {
     setShowRequestModal(true);
   };
 
-  const handleRequestSubmitted = async () => {
+  const handleRequestSubmitted = async (submittedGroupId: string | null) => {
     setShowRequestModal(false);
+    setRequestedAsGroupId(submittedGroupId);
     setRefreshingAfterSubmit(true);
     try {
       await Promise.all([
         refreshAccess(),
         isOwnerOrAdmin ? refreshGrants() : Promise.resolve(),
-        isOwner ? Promise.resolve() : refreshMyRequest(),
+        isOwner
+          ? Promise.resolve()
+          : fetchMyRequestForResource(id!, submittedGroupId)
+              .catch(() => null)
+              .then(setMyRequest),
       ]);
     } finally {
       setRefreshingAfterSubmit(false);
