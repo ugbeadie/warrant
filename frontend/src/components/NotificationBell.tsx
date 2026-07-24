@@ -8,15 +8,30 @@ import {
 import { timeAgo } from "../lib/timeAgo";
 import { Bell } from "lucide-react";
 
+const POLL_INTERVAL_MS = 30000;
+
 export const NotificationBell = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
+  const loadNotifications = () => {
     fetchMyNotifications()
       .then(setNotifications)
       .catch(() => {});
+  };
+
+  useEffect(() => {
+    loadNotifications();
+
+    const interval = setInterval(loadNotifications, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (open) {
+      loadNotifications();
+    }
+  }, [open]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 

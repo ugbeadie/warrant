@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import prisma from "../config/prisma.js";
 
-const UNUSED_THRESHOLD_DAYS = 7;
+const UNUSED_THRESHOLD_DAYS = 3;
 
 const flagUnusedGrants = async () => {
   const now = new Date();
@@ -17,7 +17,7 @@ const flagUnusedGrants = async () => {
         { lastAccessedAt: null, grantedAt: { lt: thresholdDate } },
       ],
     },
-    include: { resource: { include: { owner: true } } },
+    include: { resource: { include: { owner: true } }, role: true },
   });
 
   for (const grant of staleGrants) {
@@ -50,6 +50,15 @@ const flagUnusedGrants = async () => {
         message: `A grant on "${grant.resource.name}" hasn't been used in ${UNUSED_THRESHOLD_DAYS}+ days and may be worth reviewing.`,
       },
     });
+    if (grant.subjectType === "USER" && grant.userId) {
+      await prisma.notification.create({
+        data: {
+          userId: grant.userId,
+          type: "UNUSED_ACCESS_FLAGGED",
+          message: `Your ${grant.role?.name ?? ""} access to "${grant.resource.name}" hasn't been used in ${UNUSED_THRESHOLD_DAYS}+ days.`,
+        },
+      });
+    }
   }
 
   if (staleGrants.length > 0) {
