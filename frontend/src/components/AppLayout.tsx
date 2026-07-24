@@ -1,4 +1,3 @@
-// AppLayout.tsx
 import { useState, type ReactNode } from "react";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";

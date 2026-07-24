@@ -1,10 +1,31 @@
+import { useLocation } from "react-router-dom";
 import { NotificationBell } from "./NotificationBell";
 
 interface TopbarProps {
   onMenuClick: () => void;
 }
 
+const PAGE_TITLES: Record<string, string> = {
+  "/": "Dashboard",
+  "/resources": "Resources",
+  "/my-access": "My Access",
+  "/approvals": "Approvals",
+  "/groups": "Groups",
+  "/audit-log": "Audit Log",
+  "/admin": "Admin",
+};
+
+const getPageTitle = (pathname: string): string => {
+  if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
+  if (pathname.startsWith("/resources/")) return "Resource Detail";
+  if (pathname.startsWith("/groups/")) return "Group Detail";
+  return "";
+};
+
 export const Topbar = ({ onMenuClick }: TopbarProps) => {
+  const location = useLocation();
+  const pageTitle = getPageTitle(location.pathname);
+
   return (
     <header className="sticky top-0 z-20 bg-bg/80 backdrop-blur border-b border-border-dark">
       <div className="flex items-center justify-between gap-4 px-4 lg:px-8 py-4">
@@ -14,18 +35,12 @@ export const Topbar = ({ onMenuClick }: TopbarProps) => {
         >
           ☰
         </button>
-        {/* //TODO:REMOVE SEARCH BAR AND PLACE BELL TO RIGHT */}
-        <div className="flex-1 max-w-md">
-          <div className="relative w-full">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-sm">
-              ⌕
-            </span>
-            <input
-              type="text"
-              placeholder="Search resources, users..."
-              className="w-full rounded-md border border-border-dark bg-surface-raised pl-9 pr-3 py-2 text-sm text-on-dark font-mono placeholder:text-on-dark-muted outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
-            />
-          </div>
+        <div className="flex-1">
+          {pageTitle && (
+            <p className="text-sm font-mono uppercase tracking-widest text-on-dark-muted">
+              {pageTitle}
+            </p>
+          )}
         </div>
         <NotificationBell />
       </div>

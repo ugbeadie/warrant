@@ -27,4 +27,35 @@ const searchUsers = async (req, res) => {
   }
 };
 
-export { searchUsers };
+const getAllUsers = async (req, res) => {
+  try {
+    if (req.user.role !== "ADMIN") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        platformRole: true,
+        createdAt: true,
+        _count: {
+          select: {
+            grants: true,
+            ownedResources: true,
+            ownedGroups: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.status(200).json({ users });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export { searchUsers, getAllUsers };
