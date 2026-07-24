@@ -646,7 +646,7 @@ const GroupDetailPage = () => {
 
                 {transferTarget && (
                   <div className="rounded-md border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
-                    You'll be downgraded to a regular 30-day member.{" "}
+                    You'll be downgraded to a regular 1-day member.{" "}
                     {transferTarget.username} becomes the permanent owner and
                     gains full control of this group.
                   </div>

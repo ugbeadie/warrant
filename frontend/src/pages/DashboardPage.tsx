@@ -68,7 +68,9 @@ const DashboardPage = () => {
     const load = async () => {
       try {
         const activityPromise =
-          user?.role === "ADMIN" ? fetchAllAuditLog(5) : fetchMyAuditLog(5);
+          user?.role === "ADMIN"
+            ? fetchAllAuditLog({ page: 1 })
+            : fetchMyAuditLog({ page: 1 });
 
         const [resourcesData, pendingData, activityData] = await Promise.all([
           fetchMyResources(),
@@ -77,7 +79,7 @@ const DashboardPage = () => {
         ]);
         setResources(resourcesData);
         setPendingRequests(pendingData);
-        setActivity(activityData);
+        setActivity(activityData.entries.slice(0, 5));
       } finally {
         setLoading(false);
       }

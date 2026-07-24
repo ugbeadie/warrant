@@ -193,12 +193,10 @@ const createAccessRequest = async (req, res) => {
       }
 
       if (group.ownerId !== req.user.id) {
-        return res
-          .status(403)
-          .json({
-            message:
-              "Only the group owner can request access on behalf of this group",
-          });
+        return res.status(403).json({
+          message:
+            "Only the group owner can request access on behalf of this group",
+        });
       }
 
       onBehalfOfGroupId = group.id;
@@ -308,6 +306,21 @@ const createAccessRequest = async (req, res) => {
       });
     } else if (matchingRule) {
       grant = await createGrantForRequest();
+
+      await prisma.auditLog.create({
+        data: {
+          actorId: req.user.id,
+          action: "REQUEST_AUTO_APPROVED",
+          resourceId,
+          detail: {
+            requestId: accessRequest.id,
+            requestedRoleName,
+            durationMinutes,
+            onBehalfOfGroupId: onBehalfOfGroupId ?? undefined,
+            policyRuleId: matchingRule.id,
+          },
+        },
+      });
     } else {
       const resourceWithOwner = await prisma.resource.findUnique({
         where: { id: resourceId },
@@ -321,6 +334,20 @@ const createAccessRequest = async (req, res) => {
           message: onBehalfOfGroupId
             ? `New access request from ${req.user.username} on behalf of a group for "${resource.name}" needs your approval.`
             : `New access request from ${req.user.username} for "${resource.name}" needs your approval.`,
+        },
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          actorId: req.user.id,
+          action: "REQUEST_PENDING_APPROVAL",
+          resourceId,
+          detail: {
+            requestId: accessRequest.id,
+            requestedRoleName,
+            durationMinutes,
+            onBehalfOfGroupId: onBehalfOfGroupId ?? undefined,
+          },
         },
       });
     }
@@ -401,7 +428,7 @@ const decideRequest = async (req, res) => {
 
     const accessRequest = await prisma.accessRequest.findUnique({
       where: { id: req.params.id },
-      include: { resource: true },
+      include: { resource: true, requester: { select: { username: true } } },
     });
 
     if (!accessRequest) {
@@ -418,11 +445,9 @@ const decideRequest = async (req, res) => {
     const isAdmin = req.user.role === "ADMIN";
 
     if (!isOwner && !isAdmin) {
-      return res
-        .status(403)
-        .json({
-          message: "Only the resource owner or admin can decide this request",
-        });
+      return res.status(403).json({
+        message: "Only the resource owner or admin can decide this request",
+      });
     }
 
     if (accessRequest.requesterId === req.user.id) {
@@ -441,8 +466,22 @@ const decideRequest = async (req, res) => {
       include: REQUEST_INCLUDE,
     });
 
-    let grant = null;
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.user.id,
+        action: decision === "APPROVED" ? "REQUEST_APPROVED" : "REQUEST_DENIED",
+        resourceId: accessRequest.resourceId,
+        detail: {
+          requestId: accessRequest.id,
+          requesterId: accessRequest.requesterId,
+          requesterUsername: accessRequest.requester.username,
+          requestedRoleId: accessRequest.requestedRoleId,
+          onBehalfOfGroupId: updatedRequest.onBehalfOfGroupId ?? undefined,
+        },
+      },
+    });
 
+    let grant = null;
     if (decision === "APPROVED") {
       const data = updatedRequest.onBehalfOfGroupId
         ? {
@@ -482,13 +521,11 @@ const decideRequest = async (req, res) => {
       );
     }
 
-    res
-      .status(200)
-      .json({
-        message: `Request ${decision.toLowerCase()}`,
-        request: updatedRequest,
-        grant,
-      });
+    res.status(200).json({
+      message: `Request ${decision.toLowerCase()}`,
+      request: updatedRequest,
+      grant,
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal server error" });

@@ -209,7 +209,12 @@ const transferGroupOwnership = async (req, res) => {
       return res.status(404).json({ message: "New owner not found" });
     }
 
-    const EX_OWNER_MEMBERSHIP_MINUTES = 1440; // 1 days
+    const previousOwner = await prisma.user.findUnique({
+      where: { id: group.ownerId },
+      select: { username: true },
+    });
+
+    const EX_OWNER_MEMBERSHIP_MINUTES = 1440; // 1 day
 
     const updatedGroup = await prisma.$transaction(async (tx) => {
       // New owner gets (or upgrades to) a permanent membership.
@@ -254,8 +259,11 @@ const transferGroupOwnership = async (req, res) => {
         action: "GROUP_OWNERSHIP_TRANSFERRED",
         detail: {
           groupId: req.params.id,
+          groupName: group.name,
           previousOwnerId: group.ownerId,
+          previousOwnerUsername: previousOwner?.username,
           newOwnerId,
+          newOwnerUsername: newOwner.username,
         },
       },
     });

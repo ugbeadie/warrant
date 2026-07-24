@@ -39,6 +39,27 @@ const revokeGrant = async (req, res) => {
       include: GRANT_INCLUDE,
     });
 
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.user.id,
+        action: "GRANT_REVOKED",
+        resourceId: grant.resourceId,
+        detail: {
+          grantId: grant.id,
+          role: grant.role.name,
+          subjectType: grant.subjectType,
+          subjectUserId:
+            grant.subjectType === "USER" ? grant.userId : undefined,
+          subjectUsername:
+            grant.subjectType === "USER" ? grant.user?.username : undefined,
+          groupId: grant.subjectType === "GROUP" ? grant.groupId : undefined,
+          groupName:
+            grant.subjectType === "GROUP" ? grant.group?.name : undefined,
+          revokedByRole: isAdmin && !isOwner ? "ADMIN" : "OWNER",
+        },
+      },
+    });
+
     res
       .status(200)
       .json({ message: "Grant revoked successfully", grant: revokedGrant });
