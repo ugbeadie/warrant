@@ -60,6 +60,31 @@ const revokeGrant = async (req, res) => {
       },
     });
 
+    if (grant.subjectType === "USER" && grant.userId) {
+      await prisma.notification.create({
+        data: {
+          userId: grant.userId,
+          type: "GRANT_REVOKED",
+          message: `Your ${grant.role.name} access to "${grant.resource.name}" was revoked by ${req.user.username}.`,
+        },
+      });
+    } else if (grant.subjectType === "GROUP" && grant.groupId) {
+      const activeMembers = await prisma.groupMember.findMany({
+        where: { groupId: grant.groupId, status: "ACTIVE" },
+        select: { userId: true },
+      });
+
+      if (activeMembers.length > 0) {
+        await prisma.notification.createMany({
+          data: activeMembers.map((m) => ({
+            userId: m.userId,
+            type: "GRANT_REVOKED",
+            message: `Your group's ${grant.role.name} access to "${grant.resource.name}" was revoked by ${req.user.username}.`,
+          })),
+        });
+      }
+    }
+
     res
       .status(200)
       .json({ message: "Grant revoked successfully", grant: revokedGrant });

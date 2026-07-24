@@ -217,7 +217,6 @@ const transferGroupOwnership = async (req, res) => {
     const EX_OWNER_MEMBERSHIP_MINUTES = 1440; // 1 day
 
     const updatedGroup = await prisma.$transaction(async (tx) => {
-      // New owner gets (or upgrades to) a permanent membership.
       await tx.groupMember.upsert({
         where: {
           groupId_userId: { groupId: req.params.id, userId: newOwnerId },
@@ -230,8 +229,6 @@ const transferGroupOwnership = async (req, res) => {
         },
       });
 
-      // Previous owner is downgraded to a normal, time-boxed member rather
-      // than silently keeping a permanent membership forever.
       await tx.groupMember.updateMany({
         where: {
           groupId: req.params.id,
@@ -265,6 +262,14 @@ const transferGroupOwnership = async (req, res) => {
           newOwnerId,
           newOwnerUsername: newOwner.username,
         },
+      },
+    });
+
+    await prisma.notification.create({
+      data: {
+        userId: newOwnerId,
+        type: "GROUP_OWNERSHIP_TRANSFERRED",
+        message: `You are now the owner of the group "${group.name}", transferred by ${req.user.username}.`,
       },
     });
 

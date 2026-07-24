@@ -321,6 +321,14 @@ const createAccessRequest = async (req, res) => {
           },
         },
       });
+
+      await prisma.notification.create({
+        data: {
+          userId: req.user.id,
+          type: "REQUEST_AUTO_APPROVED",
+          message: `Your request for "${resource.name}" was auto-approved by policy.`,
+        },
+      });
     } else {
       const resourceWithOwner = await prisma.resource.findUnique({
         where: { id: resourceId },
@@ -481,7 +489,19 @@ const decideRequest = async (req, res) => {
       },
     });
 
+    await prisma.notification.create({
+      data: {
+        userId: accessRequest.requesterId,
+        type: decision === "APPROVED" ? "REQUEST_APPROVED" : "REQUEST_DENIED",
+        message:
+          decision === "APPROVED"
+            ? `Your request for "${accessRequest.resource.name}" was approved by ${req.user.username}.`
+            : `Your request for "${accessRequest.resource.name}" was denied by ${req.user.username}.`,
+      },
+    });
+
     let grant = null;
+
     if (decision === "APPROVED") {
       const data = updatedRequest.onBehalfOfGroupId
         ? {
