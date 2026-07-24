@@ -4,7 +4,7 @@ const GRANT_INCLUDE = {
   resource: { include: { owner: { select: { id: true, username: true } } } },
   role: true,
   user: { select: { id: true, username: true } },
-  group: { select: { id: true, name: true } },
+  group: { select: { id: true, name: true, ownerId: true } },
 };
 
 const revokeGrant = async (req, res) => {
@@ -109,10 +109,16 @@ const surrenderGrant = async (req, res) => {
       return res.status(404).json({ message: "Grant not found" });
     }
 
-    if (grant.subjectType !== "USER" || grant.userId !== req.user.id) {
-      return res
-        .status(403)
-        .json({ message: "You can only surrender your own grants" });
+    const isOwnGrant =
+      grant.subjectType === "USER" && grant.userId === req.user.id;
+    const isGroupOwnerSurrendering =
+      grant.subjectType === "GROUP" && grant.group?.ownerId === req.user.id;
+
+    if (!isOwnGrant && !isGroupOwnerSurrendering) {
+      return res.status(403).json({
+        message:
+          "You can only surrender your own grants, or a group grant you own",
+      });
     }
 
     if (grant.status !== "ACTIVE") {
@@ -132,7 +138,12 @@ const surrenderGrant = async (req, res) => {
         actorId: req.user.id,
         action: "GRANT_SURRENDERED",
         resourceId: grant.resourceId,
-        detail: { grantId: grant.id, role: grant.role.name },
+        detail: {
+          grantId: grant.id,
+          role: grant.role.name,
+          subjectType: grant.subjectType,
+          groupId: grant.subjectType === "GROUP" ? grant.groupId : undefined,
+        },
       },
     });
 

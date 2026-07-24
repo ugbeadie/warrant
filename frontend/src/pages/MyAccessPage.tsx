@@ -62,6 +62,13 @@ const MyAccessPage = () => {
     null,
   );
 
+  const [confirmingGroupGrantId, setConfirmingGroupGrantId] = useState<
+    string | null
+  >(null);
+  const [actingGroupGrantId, setActingGroupGrantId] = useState<string | null>(
+    null,
+  );
+
   const loadAll = () => {
     setLoading(true);
     Promise.all([
@@ -103,6 +110,29 @@ const MyAccessPage = () => {
     } finally {
       setActingId(null);
       setConfirmingId(null);
+    }
+  };
+
+  const handleSurrenderGroupGrant = async (grantId: string) => {
+    if (confirmingGroupGrantId !== grantId) {
+      setConfirmingGroupGrantId(grantId);
+      return;
+    }
+
+    setError("");
+    setActingGroupGrantId(grantId);
+    try {
+      await surrenderGrant(grantId);
+      setGroupGrants((prev) =>
+        prev.map((g) =>
+          g.id === grantId ? { ...g, status: "SURRENDERED" } : g,
+        ),
+      );
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Failed to surrender access");
+    } finally {
+      setActingGroupGrantId(null);
+      setConfirmingGroupGrantId(null);
     }
   };
 
@@ -275,7 +305,8 @@ const MyAccessPage = () => {
               <table className="w-full min-w-[640px] text-sm">
                 <thead>
                   <tr className="text-[10px] font-mono uppercase tracking-widest text-on-dark-muted border-b border-border-dark">
-                    <th className="text-left font-medium px-5 py-3">
+                    <th className="text-left font-medium px-5 py-3">Status</th>
+                    <th className="text-left font-medium px-2 py-3">
                       Resource
                     </th>
                     <th className="text-left font-medium px-2 py-3">Role</th>
@@ -283,17 +314,33 @@ const MyAccessPage = () => {
                       Via Group
                     </th>
                     <th className="text-left font-medium px-2 py-3">Expires</th>
+                    <th className="text-right font-medium px-5 py-3">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {groupGrants.map((grant) => {
                     const roleKey = grant.role?.name.toLowerCase() ?? "viewer";
+                    const isOwnerOfGroup = ownedGroups.some(
+                      (g) => g.id === grant.groupId,
+                    );
+                    const isConfirming = confirmingGroupGrantId === grant.id;
+                    const isActing = actingGroupGrantId === grant.id;
+
                     return (
                       <tr
                         key={grant.id}
                         className="border-b border-border-dark last:border-0"
                       >
                         <td className="px-5 py-3 whitespace-nowrap">
+                          <span
+                            className={`rounded px-2 py-0.5 text-[10px] font-mono uppercase tracking-wide ${STATUS_BADGE_STYLES[grant.status]}`}
+                          >
+                            {grant.status}
+                          </span>
+                        </td>
+                        <td className="px-2 py-3 whitespace-nowrap">
                           <Link
                             to={`/resources/${grant.resourceId}`}
                             className="text-sm font-medium text-on-dark hover:text-brand transition"
@@ -312,7 +359,42 @@ const MyAccessPage = () => {
                           {grant.viaGroupName}
                         </td>
                         <td className="px-2 py-3 text-on-dark-muted text-xs whitespace-nowrap">
-                          {expiresLabel(grant.expiresAt)}
+                          {grant.status === "ACTIVE"
+                            ? expiresLabel(grant.expiresAt)
+                            : grant.status.toLowerCase()}
+                        </td>
+                        <td className="px-5 py-3 text-right whitespace-nowrap">
+                          {grant.status === "ACTIVE" && isOwnerOfGroup ? (
+                            <div className="flex items-center justify-end gap-2">
+                              {isConfirming && !isActing && (
+                                <button
+                                  onClick={() =>
+                                    setConfirmingGroupGrantId(null)
+                                  }
+                                  className="text-[10px] font-mono uppercase tracking-wide text-on-dark-muted hover:text-on-dark transition"
+                                >
+                                  Cancel
+                                </button>
+                              )}
+                              <button
+                                onClick={() =>
+                                  handleSurrenderGroupGrant(grant.id)
+                                }
+                                disabled={isActing}
+                                className="rounded-md border border-danger/30 px-3 py-1.5 text-xs font-mono uppercase tracking-wide text-danger hover:bg-danger/10 disabled:opacity-50 transition"
+                              >
+                                {isActing
+                                  ? "..."
+                                  : isConfirming
+                                    ? "Confirm"
+                                    : "Surrender"}
+                              </button>
+                            </div>
+                          ) : grant.status === "ACTIVE" ? (
+                            <span className="text-[10px] font-mono text-on-dark-muted">
+                              Owner only
+                            </span>
+                          ) : null}
                         </td>
                       </tr>
                     );
