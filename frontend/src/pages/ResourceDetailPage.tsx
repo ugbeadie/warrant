@@ -91,14 +91,14 @@ const ResourceDetailPage = () => {
     setAccess(accessResult);
   }, [id]);
 
-  const refreshMyRequest = useCallback(async () => {
-    if (!id) return;
-    const request = await fetchMyRequestForResource(
-      id,
-      requestedAsGroupId,
-    ).catch(() => null);
-    setMyRequest(request);
-  }, [id, requestedAsGroupId]);
+  // const refreshMyRequest = useCallback(async () => {
+  //   if (!id) return;
+  //   const request = await fetchMyRequestForResource(
+  //     id,
+  //     requestedAsGroupId,
+  //   ).catch(() => null);
+  //   setMyRequest(request);
+  // }, [id, requestedAsGroupId]);
 
   useEffect(() => {
     if (!id) return;
