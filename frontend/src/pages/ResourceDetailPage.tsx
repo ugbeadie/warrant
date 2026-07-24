@@ -69,9 +69,6 @@ const ResourceDetailPage = () => {
   const [actingAction, setActingAction] = useState<"revoke" | "delete" | null>(
     null,
   );
-  const [requestedAsGroupId, setRequestedAsGroupId] = useState<string | null>(
-    null,
-  );
 
   const isOwner = resource ? resource.ownerId === user?.id : false;
 
@@ -90,15 +87,6 @@ const ResourceDetailPage = () => {
     const accessResult = await checkResourceAccess(id);
     setAccess(accessResult);
   }, [id]);
-
-  // const refreshMyRequest = useCallback(async () => {
-  //   if (!id) return;
-  //   const request = await fetchMyRequestForResource(
-  //     id,
-  //     requestedAsGroupId,
-  //   ).catch(() => null);
-  //   setMyRequest(request);
-  // }, [id, requestedAsGroupId]);
 
   useEffect(() => {
     if (!id) return;
@@ -185,7 +173,6 @@ const ResourceDetailPage = () => {
 
   const handleRequestSubmitted = async (submittedGroupId: string | null) => {
     setShowRequestModal(false);
-    setRequestedAsGroupId(submittedGroupId);
     setRefreshingAfterSubmit(true);
     try {
       await Promise.all([
