@@ -94,16 +94,21 @@ const ResourceDetailPage = () => {
     const load = async () => {
       setLoading(true);
       try {
-        const [resourceData, accessResult] = await Promise.all([
-          fetchResourceById(id),
-          checkResourceAccess(id),
-        ]);
+        const resourceData = await fetchResourceById(id);
         setResource(resourceData);
-        setAccess(accessResult);
 
         const isTrueOwner = resourceData.ownerId === user?.id;
         const isAdminOverride = user?.role === "ADMIN";
-        const [grantsData, request] = await Promise.all([
+
+        // Owners don't need an access-check result — the UI always shows
+        // "Log_Access_Session" for them regardless of hasAccess. Skip the
+        // request (and its 403 + preflight) entirely in that case.
+        const accessPromise = isTrueOwner
+          ? Promise.resolve(null)
+          : checkResourceAccess(id);
+
+        const [accessResult, grantsData, request] = await Promise.all([
+          accessPromise,
           isTrueOwner || isAdminOverride
             ? fetchGrantsForResource(id)
             : Promise.resolve(null),
@@ -112,10 +117,8 @@ const ResourceDetailPage = () => {
             : Promise.resolve(null),
         ]);
 
-        if (isTrueOwner || isAdminOverride) {
-          setGrants(grantsData ?? []);
-        }
-
+        if (accessResult) setAccess(accessResult);
+        if (isTrueOwner || isAdminOverride) setGrants(grantsData ?? []);
         setMyRequest(isTrueOwner ? null : request);
       } finally {
         setLoading(false);
