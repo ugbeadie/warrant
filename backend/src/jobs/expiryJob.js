@@ -44,10 +44,6 @@ const sweepExpiredGrants = async () => {
 
 const sweepExpiredMemberships = async () => {
   const now = new Date();
-
-  // expiresAt: null means "never expires" (e.g. a group owner's permanent
-  // membership) — explicitly excluded here rather than relying on NULL
-  // comparison semantics implicitly doing the right thing.
   const expiredMemberships = await prisma.groupMember.findMany({
     where: {
       status: "ACTIVE",

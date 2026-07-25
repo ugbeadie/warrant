@@ -20,7 +20,6 @@ const ROLE_BADGE_STYLES: Record<string, string> = {
 
 const DASHBOARD_ACTIVITY_PREVIEW_COUNT = 5;
 
-// Same "unused" definition as MyAccessPage: active, and not touched in 3+ days.
 const isUnused = (grant: Grant) => {
   if (grant.status !== "ACTIVE") return false;
   const referenceDate = grant.lastAccessedAt ?? grant.grantedAt;

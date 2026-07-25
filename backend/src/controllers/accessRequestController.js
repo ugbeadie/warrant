@@ -45,10 +45,6 @@ const evaluateAutoApproval = async (
 
   return null;
 };
-
-// Blocks a new request if the same subject (user OR group, depending on
-// whether this is an on-behalf-of-group request) already has a pending
-// request, or an active grant that's sufficient / for the same role.
 const findBlockingRequest = async (
   requesterId,
   resourceId,
@@ -105,9 +101,6 @@ const findBlockingRequest = async (
 
   return null;
 };
-
-// Revokes redundant lower-or-equal-ranked active grants for the same
-// subject (user or group) on the same resource, in favor of a new one.
 const supersedeLowerGrants = async (
   { subjectType, userId, groupId },
   resourceId,

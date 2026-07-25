@@ -147,7 +147,6 @@ const MyAccessPage = () => {
     try {
       await leaveGroup(groupId);
       setMemberships((prev) => prev.filter((m) => m.groupId !== groupId));
-      // Group access derived from this membership no longer applies.
       setGroupGrants((prev) => prev.filter((g) => g.groupId !== groupId));
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to leave group");
