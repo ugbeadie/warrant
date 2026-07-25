@@ -220,7 +220,7 @@ const AuditLogPage = () => {
             <div className="flex rounded-md border border-border-dark overflow-hidden w-fit">
               <button
                 onClick={() => setScope("mine")}
-                className={`px-3 py-1.5 text-xs font-mono uppercase tracking-wide transition ${
+                className={`px-3 py-1.5 text-xs font-mono uppercase tracking-wide cursor-pointer transition ${
                   scope === "mine"
                     ? "bg-brand text-white"
                     : "bg-surface-raised text-on-dark-muted hover:text-on-dark"
@@ -230,7 +230,7 @@ const AuditLogPage = () => {
               </button>
               <button
                 onClick={() => setScope("all")}
-                className={`px-3 py-1.5 text-xs font-mono uppercase tracking-wide transition ${
+                className={`px-3 py-1.5 text-xs font-mono uppercase tracking-wide cursor-pointer transition ${
                   scope === "all"
                     ? "bg-brand text-white"
                     : "bg-surface-raised text-on-dark-muted hover:text-on-dark"
@@ -261,7 +261,7 @@ const AuditLogPage = () => {
             <select
               value={actionFilter}
               onChange={(e) => setActionFilter(e.target.value)}
-              className="appearance-none rounded-md border border-border-dark bg-surface-raised pl-3.5 pr-8 py-2.5 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+              className="appearance-none rounded-md border border-border-dark bg-surface-raised pl-3.5 pr-8 py-2.5 text-sm text-on-dark font-mono cursor-pointer outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             >
               <option value="all">All Actions</option>
               {ALL_ACTION_OPTIONS.map((a) => (
@@ -400,7 +400,7 @@ const AuditLogPage = () => {
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page <= 1}
-                  className="flex items-center gap-1 rounded-md border border-border-dark px-2.5 py-1.5 text-xs font-mono uppercase tracking-wide text-on-dark-muted hover:text-on-dark disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  className="flex items-center gap-1 rounded-md border border-border-dark px-2.5 py-1.5 text-xs font-mono uppercase tracking-wide text-on-dark-muted cursor-pointer hover:text-on-dark disabled:opacity-40 disabled:cursor-not-allowed transition"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                   Prev
@@ -408,7 +408,7 @@ const AuditLogPage = () => {
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page >= totalPages}
-                  className="flex items-center gap-1 rounded-md border border-border-dark px-2.5 py-1.5 text-xs font-mono uppercase tracking-wide text-on-dark-muted hover:text-on-dark disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  className="flex items-center gap-1 rounded-md border border-border-dark px-2.5 py-1.5 text-xs font-mono uppercase tracking-wide text-on-dark-muted cursor-pointer hover:text-on-dark disabled:opacity-40 disabled:cursor-not-allowed transition"
                 >
                   Next
                   <ChevronRight className="w-3.5 h-3.5" />

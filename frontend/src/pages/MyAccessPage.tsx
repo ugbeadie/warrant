@@ -254,7 +254,7 @@ const MyAccessPage = () => {
                               {isConfirming && !isActing && (
                                 <button
                                   onClick={() => setConfirmingId(null)}
-                                  className="text-[10px] font-mono uppercase tracking-wide text-on-dark-muted hover:text-on-dark transition"
+                                  className="text-[10px] font-mono uppercase tracking-wide text-on-dark-muted cursor-pointer hover:text-on-dark transition"
                                 >
                                   Cancel
                                 </button>
@@ -262,7 +262,7 @@ const MyAccessPage = () => {
                               <button
                                 onClick={() => handleSurrender(grant.id)}
                                 disabled={isActing}
-                                className="rounded-md border border-danger/30 px-3 py-1.5 text-xs font-mono uppercase tracking-wide text-danger hover:bg-danger/10 disabled:opacity-50 transition"
+                                className="rounded-md border border-danger/30 px-3 py-1.5 text-xs font-mono uppercase tracking-wide text-danger cursor-pointer hover:bg-danger/10 disabled:opacity-50 disabled:cursor-not-allowed transition"
                               >
                                 {isActing
                                   ? "..."
@@ -370,7 +370,7 @@ const MyAccessPage = () => {
                                   onClick={() =>
                                     setConfirmingGroupGrantId(null)
                                   }
-                                  className="text-[10px] font-mono uppercase tracking-wide text-on-dark-muted hover:text-on-dark transition"
+                                  className="text-[10px] font-mono uppercase tracking-wide text-on-dark-muted cursor-pointer hover:text-on-dark transition"
                                 >
                                   Cancel
                                 </button>
@@ -380,7 +380,7 @@ const MyAccessPage = () => {
                                   handleSurrenderGroupGrant(grant.id)
                                 }
                                 disabled={isActing}
-                                className="rounded-md border border-danger/30 px-3 py-1.5 text-xs font-mono uppercase tracking-wide text-danger hover:bg-danger/10 disabled:opacity-50 transition"
+                                className="rounded-md border border-danger/30 px-3 py-1.5 text-xs font-mono uppercase tracking-wide text-danger cursor-pointer hover:bg-danger/10 disabled:opacity-50 disabled:cursor-not-allowed transition"
                               >
                                 {isActing
                                   ? "..."
@@ -455,7 +455,7 @@ const MyAccessPage = () => {
                         {isConfirmingLeave && !isLeaving && (
                           <button
                             onClick={() => setConfirmingLeaveId(null)}
-                            className="text-[10px] font-mono uppercase tracking-wide text-on-dark-muted hover:text-on-dark transition"
+                            className="text-[10px] font-mono uppercase tracking-wide text-on-dark-muted cursor-pointer hover:text-on-dark transition"
                           >
                             Cancel
                           </button>
@@ -463,7 +463,7 @@ const MyAccessPage = () => {
                         <button
                           onClick={() => handleLeaveGroup(m.groupId)}
                           disabled={isLeaving}
-                          className="rounded-md border border-danger/30 px-3 py-1.5 text-xs font-mono uppercase tracking-wide text-danger hover:bg-danger/10 disabled:opacity-50 transition"
+                          className="rounded-md border border-danger/30 px-3 py-1.5 text-xs font-mono uppercase tracking-wide text-danger cursor-pointer hover:bg-danger/10 disabled:opacity-50 disabled:cursor-not-allowed transition"
                         >
                           {isLeaving
                             ? "..."

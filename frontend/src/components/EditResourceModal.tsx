@@ -137,7 +137,7 @@ export const EditResourceModal = ({
           </p>
           <button
             onClick={onClose}
-            className="text-on-dark-muted hover:text-on-dark transition"
+            className="text-on-dark-muted cursor-pointer hover:text-on-dark transition"
           >
             <X className="w-4 h-4" />
           </button>
@@ -165,7 +165,7 @@ export const EditResourceModal = ({
             <select
               value={requiredRoleName}
               onChange={(e) => handleRequiredRoleChange(e.target.value)}
-              className="w-full rounded-md border border-border-dark bg-bg px-3 py-2.5 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+              className="w-full rounded-md border border-border-dark bg-bg px-3 py-2.5 text-sm text-on-dark font-mono cursor-pointer outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             >
               <option value="viewer">Viewer</option>
               <option value="editor">Editor</option>
@@ -174,13 +174,13 @@ export const EditResourceModal = ({
           </div>
 
           <div className="rounded-md border border-border-dark bg-bg p-3">
-            <label className="flex items-center gap-2 text-xs font-mono uppercase tracking-wide text-on-dark">
+            <label className="flex items-center gap-2 text-xs font-mono uppercase tracking-wide text-on-dark cursor-pointer has-disabled:cursor-not-allowed">
               <input
                 type="checkbox"
                 checked={addRule}
                 disabled={rulesLoading}
                 onChange={(e) => setAddRule(e.target.checked)}
-                className="accent-brand"
+                className="accent-brand cursor-pointer disabled:cursor-not-allowed"
               />
               Add auto-approve policy rule
             </label>
@@ -194,7 +194,7 @@ export const EditResourceModal = ({
                   <select
                     value={ruleMaxRoleName}
                     onChange={(e) => setRuleMaxRoleName(e.target.value)}
-                    className="w-full rounded-md border border-border-dark bg-surface-raised px-3 py-2 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                    className="w-full rounded-md border border-border-dark bg-surface-raised px-3 py-2 text-sm text-on-dark font-mono cursor-pointer outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                   >
                     {eligibleMaxRoles.map((r) => (
                       <option key={r.name} value={r.name}>
@@ -237,14 +237,14 @@ export const EditResourceModal = ({
             <button
               type="button"
               onClick={onClose}
-              className="text-xs font-mono uppercase tracking-wide text-on-dark-muted hover:text-on-dark transition"
+              className="text-xs font-mono uppercase tracking-wide text-on-dark-muted cursor-pointer hover:text-on-dark transition"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving || rulesLoading}
-              className="rounded-md bg-brand px-5 py-2 text-xs font-mono font-semibold uppercase tracking-wide text-white hover:bg-brand-hover disabled:opacity-50 transition"
+              className="rounded-md bg-brand px-5 py-2 text-xs font-mono font-semibold uppercase tracking-wide text-white cursor-pointer hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
               {saving ? "Saving..." : "Save_Changes"}
             </button>

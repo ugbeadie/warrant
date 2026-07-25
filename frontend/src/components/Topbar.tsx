@@ -31,7 +31,7 @@ export const Topbar = ({ onMenuClick }: TopbarProps) => {
       <div className="flex items-center justify-between gap-4 px-4 lg:px-8 py-4">
         <button
           onClick={onMenuClick}
-          className="lg:hidden h-8 w-8 flex items-center justify-center text-on-dark-muted hover:text-on-dark transition shrink-0"
+          className="lg:hidden h-8 w-8 flex items-center justify-center text-on-dark-muted cursor-pointer hover:text-on-dark transition shrink-0"
         >
           ☰
         </button>

@@ -106,7 +106,7 @@ const ApprovalsPage = () => {
             <div className="flex rounded-md border border-border-dark overflow-hidden w-fit">
               <button
                 onClick={() => setScope("mine")}
-                className={`px-3 py-1.5 text-xs font-mono uppercase tracking-wide transition ${
+                className={`px-3 py-1.5 text-xs font-mono uppercase tracking-wide cursor-pointer transition ${
                   scope === "mine"
                     ? "bg-brand text-white"
                     : "bg-surface-raised text-on-dark-muted hover:text-on-dark"
@@ -116,7 +116,7 @@ const ApprovalsPage = () => {
               </button>
               <button
                 onClick={() => setScope("all")}
-                className={`px-3 py-1.5 text-xs font-mono uppercase tracking-wide transition ${
+                className={`px-3 py-1.5 text-xs font-mono uppercase tracking-wide cursor-pointer transition ${
                   scope === "all"
                     ? "bg-brand text-white"
                     : "bg-surface-raised text-on-dark-muted hover:text-on-dark"
@@ -230,7 +230,7 @@ const ApprovalsPage = () => {
                             <button
                               onClick={() => handleDecision(req.id, "DENIED")}
                               disabled={isActing}
-                              className="flex items-center gap-1 rounded-md border border-danger/30 px-3 py-1.5 text-xs font-mono uppercase tracking-wide text-danger hover:bg-danger/10 disabled:opacity-50 transition whitespace-nowrap"
+                              className="flex items-center gap-1 rounded-md border border-danger/30 px-3 py-1.5 text-xs font-mono uppercase tracking-wide text-danger cursor-pointer hover:bg-danger/10 disabled:opacity-50 disabled:cursor-not-allowed transition whitespace-nowrap"
                             >
                               <X className="w-3 h-3" />
                               Deny
@@ -240,7 +240,7 @@ const ApprovalsPage = () => {
                                 handleApproveClick(req, isInsufficient)
                               }
                               disabled={isActing}
-                              className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-mono uppercase tracking-wide text-white disabled:opacity-50 transition whitespace-nowrap ${
+                              className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-mono uppercase tracking-wide text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition whitespace-nowrap ${
                                 isConfirming
                                   ? "bg-warning hover:bg-warning/90"
                                   : "bg-brand hover:bg-brand-hover"
@@ -257,7 +257,7 @@ const ApprovalsPage = () => {
                           {isConfirming && !isActing && (
                             <button
                               onClick={() => setConfirmingId(null)}
-                              className="mt-1.5 block ml-auto text-[10px] font-mono uppercase tracking-wide text-on-dark-muted hover:text-on-dark transition"
+                              className="mt-1.5 block ml-auto text-[10px] font-mono uppercase tracking-wide text-on-dark-muted cursor-pointer hover:text-on-dark transition"
                             >
                               Cancel
                             </button>

@@ -252,14 +252,14 @@ const ResourceDetailPage = () => {
               <>
                 <button
                   onClick={() => setShowEditModal(true)}
-                  className="flex items-center gap-1.5 rounded-md border border-border-dark px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-on-dark hover:bg-bg transition"
+                  className="flex items-center gap-1.5 rounded-md border border-border-dark px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-on-dark cursor-pointer hover:bg-bg transition"
                 >
                   <Pencil className="w-3.5 h-3.5" />
                   Edit
                 </button>
                 <button
                   onClick={() => setShowConfirmDeleteModal(true)}
-                  className="flex items-center gap-1.5 rounded-md border border-danger/30 px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-danger hover:bg-danger/10 transition"
+                  className="flex items-center gap-1.5 rounded-md border border-danger/30 px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-danger cursor-pointer hover:bg-danger/10 transition"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   Delete
@@ -275,7 +275,7 @@ const ResourceDetailPage = () => {
             ) : isOwner ? (
               <button
                 onClick={handleRequestAccessClick}
-                className="rounded-md bg-brand px-5 py-2.5 text-sm font-mono font-semibold uppercase tracking-wide text-white hover:bg-brand-hover transition shrink-0"
+                className="rounded-md bg-brand px-5 py-2.5 text-sm font-mono font-semibold uppercase tracking-wide text-white cursor-pointer hover:bg-brand-hover transition shrink-0"
               >
                 Log_Access_Session
               </button>
@@ -290,7 +290,7 @@ const ResourceDetailPage = () => {
             ) : (
               <button
                 onClick={handleRequestAccessClick}
-                className="rounded-md bg-brand px-5 py-2.5 text-sm font-mono font-semibold uppercase tracking-wide text-white hover:bg-brand-hover transition shrink-0"
+                className="rounded-md bg-brand px-5 py-2.5 text-sm font-mono font-semibold uppercase tracking-wide text-white cursor-pointer hover:bg-brand-hover transition shrink-0"
               >
                 Request_Access
               </button>
@@ -400,7 +400,7 @@ const ResourceDetailPage = () => {
                                 <button
                                   onClick={() => handleRevoke(grant.id)}
                                   disabled={actingGrantId === grant.id}
-                                  className="text-xs font-mono uppercase text-danger hover:underline disabled:opacity-50"
+                                  className="text-xs font-mono uppercase text-danger cursor-pointer hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   {actingGrantId === grant.id &&
                                   actingAction === "revoke"
@@ -411,7 +411,7 @@ const ResourceDetailPage = () => {
                                 <button
                                   onClick={() => handleDeleteGrant(grant.id)}
                                   disabled={actingGrantId === grant.id}
-                                  className="text-xs font-mono uppercase text-on-dark-muted hover:text-danger transition disabled:opacity-50"
+                                  className="text-xs font-mono uppercase text-on-dark-muted cursor-pointer hover:text-danger transition disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   {actingGrantId === grant.id &&
                                   actingAction === "delete"

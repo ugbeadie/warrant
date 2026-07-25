@@ -355,7 +355,7 @@ const GroupDetailPage = () => {
             {isOwner && (
               <button
                 onClick={() => setShowAddMember(true)}
-                className="flex items-center gap-1.5 rounded-md bg-brand px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-white hover:bg-brand-hover transition"
+                className="flex items-center gap-1.5 rounded-md bg-brand px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-white cursor-pointer hover:bg-brand-hover transition"
               >
                 <UserPlus className="w-3.5 h-3.5" />
                 Add_Member
@@ -364,7 +364,7 @@ const GroupDetailPage = () => {
             {isOwner && (
               <button
                 onClick={() => setShowTransfer(true)}
-                className="flex items-center gap-1.5 rounded-md border border-border-dark px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-on-dark hover:bg-bg transition"
+                className="flex items-center gap-1.5 rounded-md border border-border-dark px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-on-dark cursor-pointer hover:bg-bg transition"
               >
                 <Repeat className="w-3.5 h-3.5" />
                 Transfer
@@ -373,7 +373,7 @@ const GroupDetailPage = () => {
             {isOwnerOrAdmin && (
               <button
                 onClick={() => setShowConfirmDeleteModal(true)}
-                className="flex items-center gap-1.5 rounded-md border border-danger/30 px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-danger hover:bg-danger/10 transition"
+                className="flex items-center gap-1.5 rounded-md border border-danger/30 px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-danger cursor-pointer hover:bg-danger/10 transition"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 Delete
@@ -396,7 +396,7 @@ const GroupDetailPage = () => {
                     setShowAddMember(false);
                     resetAddMemberForm();
                   }}
-                  className="text-on-dark-muted hover:text-on-dark transition"
+                  className="text-on-dark-muted cursor-pointer hover:text-on-dark transition"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -424,7 +424,7 @@ const GroupDetailPage = () => {
                           setSelectedUser(null);
                           setSearchQuery("");
                         }}
-                        className="text-xs font-mono uppercase text-on-dark-muted hover:text-on-dark transition"
+                        className="text-xs font-mono uppercase text-on-dark-muted cursor-pointer hover:text-on-dark transition"
                       >
                         Change
                       </button>
@@ -462,7 +462,7 @@ const GroupDetailPage = () => {
                                   setSelectedUser(u);
                                   setSearchResults([]);
                                 }}
-                                className="w-full text-left px-3 py-2 hover:bg-surface-raised transition"
+                                className="w-full text-left px-3 py-2 cursor-pointer hover:bg-surface-raised transition"
                               >
                                 <p className="text-sm text-on-dark">
                                   {u.username}
@@ -488,7 +488,7 @@ const GroupDetailPage = () => {
                     onChange={(e) =>
                       setNewDurationChoice(Number(e.target.value))
                     }
-                    className="w-full rounded-md border border-border-dark bg-bg px-3 py-2.5 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                    className="w-full rounded-md border border-border-dark bg-bg px-3 py-2.5 text-sm text-on-dark font-mono cursor-pointer outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                   >
                     {DURATION_OPTIONS.map((opt) => (
                       <option key={opt.label} value={opt.minutes}>
@@ -510,7 +510,7 @@ const GroupDetailPage = () => {
                       <select
                         value={customUnit}
                         onChange={(e) => setCustomUnit(e.target.value as any)}
-                        className="flex-1 rounded-md border border-border-dark bg-bg px-3 py-2 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                        className="flex-1 rounded-md border border-border-dark bg-bg px-3 py-2 text-sm text-on-dark font-mono cursor-pointer outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                       >
                         <option value="minutes">Minutes</option>
                         <option value="hours">Hours</option>
@@ -531,14 +531,14 @@ const GroupDetailPage = () => {
                       setShowAddMember(false);
                       resetAddMemberForm();
                     }}
-                    className="text-xs font-mono uppercase tracking-wide text-on-dark-muted hover:text-on-dark transition"
+                    className="text-xs font-mono uppercase tracking-wide text-on-dark-muted cursor-pointer hover:text-on-dark transition"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={adding || !selectedUser}
-                    className="rounded-md bg-brand px-5 py-2 text-xs font-mono font-semibold uppercase tracking-wide text-white hover:bg-brand-hover disabled:opacity-50 transition"
+                    className="rounded-md bg-brand px-5 py-2 text-xs font-mono font-semibold uppercase tracking-wide text-white cursor-pointer hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition"
                   >
                     {adding ? "Adding..." : "Add_Member"}
                   </button>
@@ -560,7 +560,7 @@ const GroupDetailPage = () => {
                     setShowTransfer(false);
                     resetTransferForm();
                   }}
-                  className="text-on-dark-muted hover:text-on-dark transition"
+                  className="text-on-dark-muted cursor-pointer hover:text-on-dark transition"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -589,7 +589,7 @@ const GroupDetailPage = () => {
                           setTransferQuery("");
                           setConfirmingTransfer(false);
                         }}
-                        className="text-xs font-mono uppercase text-on-dark-muted hover:text-on-dark transition"
+                        className="text-xs font-mono uppercase text-on-dark-muted cursor-pointer hover:text-on-dark transition"
                       >
                         Change
                       </button>
@@ -627,7 +627,7 @@ const GroupDetailPage = () => {
                                   setTransferTarget(u);
                                   setTransferResults([]);
                                 }}
-                                className="w-full text-left px-3 py-2 hover:bg-surface-raised transition"
+                                className="w-full text-left px-3 py-2 cursor-pointer hover:bg-surface-raised transition"
                               >
                                 <p className="text-sm text-on-dark">
                                   {u.username}
@@ -665,7 +665,7 @@ const GroupDetailPage = () => {
                       setShowTransfer(false);
                       resetTransferForm();
                     }}
-                    className="text-xs font-mono uppercase tracking-wide text-on-dark-muted hover:text-on-dark transition"
+                    className="text-xs font-mono uppercase tracking-wide text-on-dark-muted cursor-pointer hover:text-on-dark transition"
                   >
                     Cancel
                   </button>
@@ -673,7 +673,7 @@ const GroupDetailPage = () => {
                     type="button"
                     onClick={handleTransfer}
                     disabled={transferring || !transferTarget}
-                    className={`rounded-md px-5 py-2 text-xs font-mono font-semibold uppercase tracking-wide text-white disabled:opacity-50 transition ${
+                    className={`rounded-md px-5 py-2 text-xs font-mono font-semibold uppercase tracking-wide text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition ${
                       confirmingTransfer
                         ? "bg-warning hover:bg-warning/90"
                         : "bg-brand hover:bg-brand-hover"
@@ -746,7 +746,7 @@ const GroupDetailPage = () => {
                                 {isConfirming && !isRemoving && (
                                   <button
                                     onClick={() => setConfirmingUserId(null)}
-                                    className="text-[10px] font-mono uppercase tracking-wide text-on-dark-muted hover:text-on-dark transition"
+                                    className="text-[10px] font-mono uppercase tracking-wide text-on-dark-muted cursor-pointer hover:text-on-dark transition"
                                   >
                                     Cancel
                                   </button>
@@ -754,7 +754,7 @@ const GroupDetailPage = () => {
                                 <button
                                   onClick={() => handleRemoveMember(m.userId)}
                                   disabled={isRemoving}
-                                  className="text-xs font-mono uppercase text-danger hover:underline disabled:opacity-50"
+                                  className="text-xs font-mono uppercase text-danger cursor-pointer hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   {isRemoving
                                     ? "Removing..."
@@ -770,7 +770,7 @@ const GroupDetailPage = () => {
                                     onClick={() =>
                                       setConfirmingLeaveSelf(false)
                                     }
-                                    className="text-[10px] font-mono uppercase tracking-wide text-on-dark-muted hover:text-on-dark transition"
+                                    className="text-[10px] font-mono uppercase tracking-wide text-on-dark-muted cursor-pointer hover:text-on-dark transition"
                                   >
                                     Cancel
                                   </button>
@@ -778,7 +778,7 @@ const GroupDetailPage = () => {
                                 <button
                                   onClick={handleLeaveGroup}
                                   disabled={leavingSelf}
-                                  className="text-xs font-mono uppercase text-danger hover:underline disabled:opacity-50"
+                                  className="text-xs font-mono uppercase text-danger cursor-pointer hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   {leavingSelf
                                     ? "Leaving..."

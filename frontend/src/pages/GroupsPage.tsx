@@ -61,7 +61,7 @@ const GroupsPage = () => {
             />
             <button
               onClick={() => setShowCreate(true)}
-              className="flex items-center gap-2 font-mono uppercase rounded-md bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-hover transition shrink-0"
+              className="flex items-center gap-2 font-mono uppercase rounded-md bg-brand px-4 py-2.5 text-sm font-semibold text-white cursor-pointer hover:bg-brand-hover transition shrink-0"
             >
               New_Group
             </button>
@@ -71,7 +71,7 @@ const GroupsPage = () => {
         <div className="mt-4 flex rounded-md border border-border-dark overflow-hidden w-fit">
           <button
             onClick={() => setScope("all")}
-            className={`px-3 py-1.5 text-xs font-mono uppercase tracking-wide transition ${
+            className={`px-3 py-1.5 text-xs font-mono uppercase tracking-wide cursor-pointer transition ${
               scope === "all"
                 ? "bg-brand text-white"
                 : "bg-surface-raised text-on-dark-muted hover:text-on-dark"
@@ -81,7 +81,7 @@ const GroupsPage = () => {
           </button>
           <button
             onClick={() => setScope("mine")}
-            className={`px-3 py-1.5 text-xs font-mono uppercase tracking-wide transition ${
+            className={`px-3 py-1.5 text-xs font-mono uppercase tracking-wide cursor-pointer transition ${
               scope === "mine"
                 ? "bg-brand text-white"
                 : "bg-surface-raised text-on-dark-muted hover:text-on-dark"

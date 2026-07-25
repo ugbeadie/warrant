@@ -86,7 +86,7 @@ export const Sidebar = ({
           </button>
           <button
             onClick={onMobileClose}
-            className="lg:hidden h-6 w-6 flex items-center justify-center text-on-dark-muted hover:text-on-dark transition"
+            className="lg:hidden h-6 w-6 flex items-center justify-center text-on-dark-muted cursor-pointer hover:text-on-dark transition"
           >
             ✕
           </button>

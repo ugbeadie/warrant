@@ -40,7 +40,7 @@ export const CreateGroupModal = ({
           </p>
           <button
             onClick={onClose}
-            className="text-on-dark-muted hover:text-on-dark transition"
+            className="text-on-dark-muted cursor-pointer hover:text-on-dark transition"
           >
             <X className="w-4 h-4" />
           </button>
@@ -68,14 +68,14 @@ export const CreateGroupModal = ({
             <button
               type="button"
               onClick={onClose}
-              className="text-xs font-mono uppercase tracking-wide text-on-dark-muted hover:text-on-dark transition"
+              className="text-xs font-mono uppercase tracking-wide text-on-dark-muted cursor-pointer hover:text-on-dark transition"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={creating}
-              className="rounded-md bg-brand px-5 py-2 text-xs font-mono font-semibold uppercase tracking-wide text-white hover:bg-brand-hover disabled:opacity-50 transition"
+              className="rounded-md bg-brand px-5 py-2 text-xs font-mono font-semibold uppercase tracking-wide text-white cursor-pointer hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
               {creating ? "Creating..." : "Create_Group"}
             </button>

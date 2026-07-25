@@ -147,7 +147,7 @@ export const RequestAccessModal = ({
           </p>
           <button
             onClick={onClose}
-            className="text-on-dark-muted hover:text-on-dark transition"
+            className="text-on-dark-muted cursor-pointer hover:text-on-dark transition"
           >
             <X className="w-4 h-4" />
           </button>
@@ -171,7 +171,7 @@ export const RequestAccessModal = ({
               <select
                 value={onBehalfOfGroupId}
                 onChange={(e) => setOnBehalfOfGroupId(e.target.value)}
-                className="w-full rounded-md border border-border-dark bg-bg px-3 py-2.5 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                className="w-full rounded-md border border-border-dark bg-bg px-3 py-2.5 text-sm text-on-dark font-mono cursor-pointer outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
               >
                 <option value="">Myself</option>
                 {ownedGroups.map((g) => (
@@ -196,7 +196,7 @@ export const RequestAccessModal = ({
             <select
               value={requestedRoleName}
               onChange={(e) => setRequestedRoleName(e.target.value)}
-              className="w-full rounded-md border border-border-dark bg-bg px-3 py-2.5 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+              className="w-full rounded-md border border-border-dark bg-bg px-3 py-2.5 text-sm text-on-dark font-mono cursor-pointer outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             >
               <option value="viewer">Viewer</option>
               <option value="editor">Editor</option>
@@ -220,7 +220,7 @@ export const RequestAccessModal = ({
             <select
               value={durationChoice}
               onChange={(e) => setDurationChoice(Number(e.target.value))}
-              className="w-full rounded-md border border-border-dark bg-bg px-3 py-2.5 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+              className="w-full rounded-md border border-border-dark bg-bg px-3 py-2.5 text-sm text-on-dark font-mono cursor-pointer outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             >
               {DURATION_OPTIONS.map((opt) => (
                 <option key={opt.label} value={opt.minutes}>
@@ -242,7 +242,7 @@ export const RequestAccessModal = ({
                 <select
                   value={customUnit}
                   onChange={(e) => setCustomUnit(e.target.value as any)}
-                  className="flex-1 rounded-md border border-border-dark bg-bg px-3 py-2 text-sm text-on-dark font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                  className="flex-1 rounded-md border border-border-dark bg-bg px-3 py-2 text-sm text-on-dark font-mono cursor-pointer outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                 >
                   <option value="minutes">Minutes</option>
                   <option value="hours">Hours</option>
@@ -297,14 +297,14 @@ export const RequestAccessModal = ({
             <button
               type="button"
               onClick={onClose}
-              className="text-xs font-mono uppercase tracking-wide text-on-dark-muted hover:text-on-dark transition"
+              className="text-xs font-mono uppercase tracking-wide text-on-dark-muted cursor-pointer hover:text-on-dark transition"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="rounded-md bg-brand px-5 py-2 text-xs font-mono font-semibold uppercase tracking-wide text-white hover:bg-brand-hover disabled:opacity-50 transition"
+              className="rounded-md bg-brand px-5 py-2 text-xs font-mono font-semibold uppercase tracking-wide text-white cursor-pointer hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
               {submitting ? "Submitting..." : "Submit_Request"}
             </button>
