@@ -49,8 +49,9 @@ const expiresLabel = (expiresAt: string) => {
 };
 
 const ResourceDetailPage = () => {
+  console.log("ResourceDetailPage mounted/rendered");
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, sessionLoading } = useAuth();
   const navigate = useNavigate();
 
   const [resource, setResource] = useState<Resource | null>(null);
@@ -89,7 +90,7 @@ const ResourceDetailPage = () => {
   }, [id]);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || sessionLoading) return;
 
     const load = async () => {
       setLoading(true);
@@ -100,9 +101,6 @@ const ResourceDetailPage = () => {
         const isTrueOwner = resourceData.ownerId === user?.id;
         const isAdminOverride = user?.role === "ADMIN";
 
-        // Owners don't need an access-check result — the UI always shows
-        // "Log_Access_Session" for them regardless of hasAccess. Skip the
-        // request (and its 403 + preflight) entirely in that case.
         const accessPromise = isTrueOwner
           ? Promise.resolve(null)
           : checkResourceAccess(id);
