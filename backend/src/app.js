@@ -20,9 +20,14 @@ dotenv.config();
 
 const app = express();
 
+const origin =
+  process.env.NODE_ENV === "production"
+    ? "https://warrant-six.vercel.app"
+    : "http://localhost:5173";
+
 app.use(
   cors({
-    origin: "https://warrant-six.vercel.app",
+    origin,
     credentials: true,
   }),
 );

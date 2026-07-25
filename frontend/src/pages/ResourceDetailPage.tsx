@@ -94,26 +94,29 @@ const ResourceDetailPage = () => {
     const load = async () => {
       setLoading(true);
       try {
-        const resourceData = await fetchResourceById(id);
+        const [resourceData, accessResult] = await Promise.all([
+          fetchResourceById(id),
+          checkResourceAccess(id),
+        ]);
         setResource(resourceData);
-
-        const accessResult = await checkResourceAccess(id);
         setAccess(accessResult);
 
         const isTrueOwner = resourceData.ownerId === user?.id;
         const isAdminOverride = user?.role === "ADMIN";
+        const [grantsData, request] = await Promise.all([
+          isTrueOwner || isAdminOverride
+            ? fetchGrantsForResource(id)
+            : Promise.resolve(null),
+          !isTrueOwner
+            ? fetchMyRequestForResource(id).catch(() => null)
+            : Promise.resolve(null),
+        ]);
 
         if (isTrueOwner || isAdminOverride) {
-          const grantsData = await fetchGrantsForResource(id);
-          setGrants(grantsData);
+          setGrants(grantsData ?? []);
         }
 
-        if (!isTrueOwner) {
-          const request = await fetchMyRequestForResource(id).catch(() => null);
-          setMyRequest(request);
-        } else {
-          setMyRequest(null);
-        }
+        setMyRequest(isTrueOwner ? null : request);
       } finally {
         setLoading(false);
       }
