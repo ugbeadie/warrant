@@ -45,61 +45,71 @@ const evaluateAutoApproval = async (
 
   return null;
 };
-const findBlockingRequest = async (
-  requesterId,
-  resourceId,
-  requestedRoleId,
-  onBehalfOfGroupId,
-) => {
-  const now = new Date();
-
-  const resource = await prisma.resource.findUnique({
-    where: { id: resourceId },
-    include: { requiredRole: true },
-  });
-
-  if (!resource) return null;
-
-  const subjectFilter = onBehalfOfGroupId
+const requestSubjectFilter = (requesterId, onBehalfOfGroupId) =>
+  onBehalfOfGroupId
     ? { onBehalfOfGroupId }
     : { requesterId, onBehalfOfGroupId: null };
 
-  const candidates = await prisma.accessRequest.findMany({
+const grantSubjectFilter = (requesterId, onBehalfOfGroupId) =>
+  onBehalfOfGroupId
+    ? { subjectType: "GROUP", groupId: onBehalfOfGroupId }
+    : { subjectType: "USER", userId: requesterId };
+
+const findPendingRequest = (requesterId, resourceId, onBehalfOfGroupId) =>
+  prisma.accessRequest.findFirst({
     where: {
       resourceId,
-      ...subjectFilter,
-      status: { in: ["PENDING", "APPROVED"] },
+      status: "PENDING",
+      ...requestSubjectFilter(requesterId, onBehalfOfGroupId),
     },
     include: REQUEST_INCLUDE,
     orderBy: { createdAt: "desc" },
   });
 
-  for (const candidate of candidates) {
-    if (candidate.status === "PENDING") {
-      return candidate;
-    }
+// A request may only go through if it raises the subject's rank on this
+// resource. Anything at or below a live grant is rejected; the lower grant is
+// superseded by supersedeLowerGrants once the higher one is issued.
+const findBlockingGrant = (
+  requesterId,
+  resourceId,
+  requestedRank,
+  onBehalfOfGroupId,
+) =>
+  prisma.grant.findFirst({
+    where: {
+      resourceId,
+      status: "ACTIVE",
+      expiresAt: { gt: new Date() },
+      role: { rank: { gte: requestedRank } },
+      ...grantSubjectFilter(requesterId, onBehalfOfGroupId),
+    },
+    include: { role: true },
+    orderBy: { role: { rank: "desc" } },
+  });
 
-    if (
-      candidate.status === "APPROVED" &&
-      candidate.grant &&
-      candidate.grant.status === "ACTIVE" &&
-      candidate.grant.expiresAt > now
-    ) {
-      const grantRole = await prisma.role.findUnique({
-        where: { id: candidate.grant.roleId },
-      });
-      if (!grantRole) continue;
+const findCurrentRequest = async (
+  requesterId,
+  resourceId,
+  onBehalfOfGroupId,
+) => {
+  const pending = await findPendingRequest(
+    requesterId,
+    resourceId,
+    onBehalfOfGroupId,
+  );
 
-      const isSufficient = grantRole.rank >= resource.requiredRole.rank;
-      const isSameRoleBeingRequested = grantRole.id === requestedRoleId;
+  if (pending) return pending;
 
-      if (isSufficient || isSameRoleBeingRequested) {
-        return candidate;
-      }
-    }
-  }
-
-  return null;
+  return prisma.accessRequest.findFirst({
+    where: {
+      resourceId,
+      status: "APPROVED",
+      grant: { status: "ACTIVE", expiresAt: { gt: new Date() } },
+      ...requestSubjectFilter(requesterId, onBehalfOfGroupId),
+    },
+    include: REQUEST_INCLUDE,
+    orderBy: { createdAt: "desc" },
+  });
 };
 const supersedeLowerGrants = async (
   { subjectType, userId, groupId },
@@ -198,22 +208,35 @@ const createAccessRequest = async (req, res) => {
     const isOwnerRequest =
       !onBehalfOfGroupId && resource.ownerId === req.user.id;
 
-    if (!isOwnerRequest) {
-      const blocking = await findBlockingRequest(
-        req.user.id,
-        resourceId,
-        requestedRole.id,
-        onBehalfOfGroupId,
-      );
-      if (blocking) {
-        return res.status(400).json({
-          message:
-            blocking.status === "PENDING"
-              ? "There is already a pending request for this resource"
-              : "This subject already has active access to this resource",
-          request: blocking,
-        });
-      }
+    const pendingRequest = await findPendingRequest(
+      req.user.id,
+      resourceId,
+      onBehalfOfGroupId,
+    );
+
+    if (pendingRequest) {
+      return res.status(400).json({
+        message: "There is already a pending request for this resource",
+        request: pendingRequest,
+      });
+    }
+
+    const blockingGrant = await findBlockingGrant(
+      req.user.id,
+      resourceId,
+      requestedRole.rank,
+      onBehalfOfGroupId,
+    );
+
+    if (blockingGrant) {
+      const subject = onBehalfOfGroupId
+        ? "This group already has"
+        : "You already have";
+
+      return res.status(400).json({
+        message: `${subject} an active "${blockingGrant.role.name}" grant on this resource — only a higher role can be requested.`,
+        grant: blockingGrant,
+      });
     }
 
     const matchingRule = isOwnerRequest
@@ -373,10 +396,9 @@ const getMyRequestForResource = async (req, res) => {
     const { resourceId } = req.params;
     const { groupId } = req.query;
 
-    const request = await findBlockingRequest(
+    const request = await findCurrentRequest(
       req.user.id,
       resourceId,
-      null,
       groupId || null,
     );
 

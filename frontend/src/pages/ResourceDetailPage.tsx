@@ -103,12 +103,8 @@ const ResourceDetailPage = () => {
         const isTrueOwner = resourceData.ownerId === user?.id;
         const isAdminOverride = user?.role === "ADMIN";
 
-        const accessPromise = isTrueOwner
-          ? Promise.resolve(null)
-          : checkResourceAccess(id);
-
         const [accessResult, grantsData, request] = await Promise.all([
-          accessPromise,
+          checkResourceAccess(id),
           isTrueOwner || isAdminOverride
             ? fetchGrantsForResource(id)
             : Promise.resolve(null),
@@ -117,7 +113,7 @@ const ResourceDetailPage = () => {
             : Promise.resolve(null),
         ]);
 
-        if (accessResult) setAccess(accessResult);
+        setAccess(accessResult);
         if (isTrueOwner || isAdminOverride) setGrants(grantsData ?? []);
         setMyRequest(isTrueOwner ? null : request);
       } finally {
