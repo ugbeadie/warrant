@@ -21,6 +21,7 @@ import { searchUsers, type UserSearchResult } from "../lib/users";
 import { AppLayout } from "../components/AppLayout";
 import { ConfirmDeleteModal } from "../components/ConfirmDeleteModal";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import type { Group } from "../types";
 
 const DURATION_OPTIONS = [
@@ -64,11 +65,11 @@ const GroupDetailSkeleton = () => (
 const GroupDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
 
   const [group, setGroup] = useState<Group | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   const [showAddMember, setShowAddMember] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -134,7 +135,7 @@ const GroupDetailPage = () => {
     setLoading(true);
     fetchGroupById(id)
       .then(setGroup)
-      .catch(() => setError("Failed to load group"))
+      .catch(() => toast.error("Failed to load group"))
       .finally(() => setLoading(false));
   };
 
@@ -208,11 +209,15 @@ const GroupDetailPage = () => {
 
     setAddError("");
     setAdding(true);
+
+    const addedUsername = selectedUser.username;
+
     try {
       await addGroupMember(id, selectedUser.id, newDuration);
       resetAddMemberForm();
       setShowAddMember(false);
       loadGroup();
+      toast.success(`${addedUsername} added to the group`);
     } catch (err: any) {
       setAddError(err.response?.data?.message || "Failed to add member");
     } finally {
@@ -229,11 +234,20 @@ const GroupDetailPage = () => {
     }
 
     setRemovingUserId(userId);
+
+    const removedUsername = group?.members?.find((m) => m.userId === userId)
+      ?.user?.username;
+
     try {
       await removeGroupMember(id, userId);
       loadGroup();
+      toast.success(
+        removedUsername
+          ? `${removedUsername} removed from the group`
+          : "Member removed",
+      );
     } catch {
-      setError("Failed to remove member");
+      toast.error("Failed to remove member");
     } finally {
       setRemovingUserId(null);
       setConfirmingUserId(null);
@@ -248,13 +262,13 @@ const GroupDetailPage = () => {
       return;
     }
 
-    setError("");
     setLeavingSelf(true);
     try {
       await leaveGroup(id);
+      toast.success(`Left "${group?.name ?? "group"}"`);
       navigate("/groups");
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to leave group");
+      toast.error(err.response?.data?.message || "Failed to leave group");
       setLeavingSelf(false);
       setConfirmingLeaveSelf(false);
     }
@@ -265,7 +279,11 @@ const GroupDetailPage = () => {
     setDeleteError("");
     setDeleting(true);
     try {
+      const deletedName = group?.name;
       await deleteGroup(id);
+      toast.success(
+        deletedName ? `Group "${deletedName}" deleted` : "Group deleted",
+      );
       navigate("/groups");
     } catch (err: any) {
       setDeleteError(err.response?.data?.message || "Failed to delete group");
@@ -292,10 +310,12 @@ const GroupDetailPage = () => {
     setTransferError("");
     setTransferring(true);
     try {
+      const newOwnerUsername = transferTarget.username;
       await transferGroupOwnership(id, transferTarget.id);
       resetTransferForm();
       setShowTransfer(false);
       loadGroup();
+      toast.success(`Ownership transferred to ${newOwnerUsername}`);
     } catch (err: any) {
       setTransferError(
         err.response?.data?.message || "Failed to transfer ownership",
@@ -381,8 +401,6 @@ const GroupDetailPage = () => {
             )}
           </div>
         </div>
-
-        {error && <p className="mt-3 text-xs text-danger font-mono">{error}</p>}
 
         {showAddMember && (
           <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center px-4">

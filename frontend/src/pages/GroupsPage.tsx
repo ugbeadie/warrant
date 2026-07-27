@@ -6,10 +6,12 @@ import { AppLayout } from "../components/AppLayout";
 import { ResourceCardSkeleton } from "../components/ResourceCardSkeleton";
 import { CreateGroupModal } from "../components/CreateGroupModal";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import type { Group } from "../types";
 
 const GroupsPage = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [scope, setScope] = useState<"mine" | "all">("all");
@@ -33,6 +35,7 @@ const GroupsPage = () => {
 
   const handleCreated = (group: Group) => {
     setGroups((prev) => [group, ...prev]);
+    toast.success(`Group "${group.name}" created`);
   };
 
   const filteredGroups = groups.filter((g) =>

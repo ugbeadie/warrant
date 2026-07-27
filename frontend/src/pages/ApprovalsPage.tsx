@@ -9,6 +9,7 @@ import {
 import { AppLayout } from "../components/AppLayout";
 import { SkeletonRow } from "../components/SkeletonRow";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import type { AccessRequest } from "../types";
 import { timeAgo } from "../lib/timeAgo";
 
@@ -40,11 +41,11 @@ const durationLabel = (minutes: number) => {
 
 const ApprovalsPage = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [requests, setRequests] = useState<AccessRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [scope, setScope] = useState<"mine" | "all">("mine");
   const [decidingId, setDecidingId] = useState<string | null>(null);
-  const [error, setError] = useState("");
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -68,14 +69,22 @@ const ApprovalsPage = () => {
     requestId: string,
     decision: "APPROVED" | "DENIED",
   ) => {
-    setError("");
     setConfirmingId(null);
     setDecidingId(requestId);
+
+    const request = requests.find((r) => r.id === requestId);
+    const subject = request
+      ? `${request.requester.username}'s request for ${request.resource.name}`
+      : "Request";
+
     try {
       await decideRequest(requestId, decision);
       setRequests((prev) => prev.filter((r) => r.id !== requestId));
+      toast.success(
+        `${subject} ${decision === "APPROVED" ? "approved" : "denied"}`,
+      );
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to record decision");
+      toast.error(err.response?.data?.message || "Failed to record decision");
     } finally {
       setDecidingId(null);
     }
@@ -127,8 +136,6 @@ const ApprovalsPage = () => {
             </div>
           )}
         </div>
-
-        {error && <p className="mt-3 text-xs text-danger font-mono">{error}</p>}
 
         <div className="mt-6 rounded-xl border border-border-dark bg-surface-raised overflow-hidden">
           {loading ? (

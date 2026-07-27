@@ -22,7 +22,7 @@ const app = express();
 
 const origin =
   process.env.NODE_ENV === "production"
-    ? "https://warrant-six.vercel.app"
+    ? "https://warrant.ugbeadie.com"
     : "http://localhost:5173";
 
 app.use(

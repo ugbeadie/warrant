@@ -14,6 +14,7 @@ import {
   fetchMyOwnedGroups,
   leaveGroup,
 } from "../lib/groups";
+import { useToast } from "../context/ToastContext";
 
 const ROLE_BADGE_STYLES: Record<string, string> = {
   admin: "bg-danger/15 text-danger",
@@ -48,6 +49,7 @@ const isUnused = (grant: Grant) => {
 };
 
 const MyAccessPage = () => {
+  const { toast } = useToast();
   const [grants, setGrants] = useState<Grant[]>([]);
   const [groupGrants, setGroupGrants] = useState<Grant[]>([]);
   const [memberships, setMemberships] = useState<GroupMember[]>([]);
@@ -55,7 +57,6 @@ const MyAccessPage = () => {
   const [loading, setLoading] = useState(true);
   const [actingId, setActingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
-  const [error, setError] = useState("");
 
   const [leavingGroupId, setLeavingGroupId] = useState<string | null>(null);
   const [confirmingLeaveId, setConfirmingLeaveId] = useState<string | null>(
@@ -96,7 +97,6 @@ const MyAccessPage = () => {
       return;
     }
 
-    setError("");
     setActingId(grantId);
     try {
       await surrenderGrant(grantId);
@@ -105,8 +105,11 @@ const MyAccessPage = () => {
           g.id === grantId ? { ...g, status: "SURRENDERED" } : g,
         ),
       );
+      toast.success("Access surrendered");
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to surrender access");
+      toast.error(
+        err.response?.data?.message || "Failed to surrender access",
+      );
     } finally {
       setActingId(null);
       setConfirmingId(null);
@@ -119,7 +122,6 @@ const MyAccessPage = () => {
       return;
     }
 
-    setError("");
     setActingGroupGrantId(grantId);
     try {
       await surrenderGrant(grantId);
@@ -128,8 +130,11 @@ const MyAccessPage = () => {
           g.id === grantId ? { ...g, status: "SURRENDERED" } : g,
         ),
       );
+      toast.success("Group access surrendered");
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to surrender access");
+      toast.error(
+        err.response?.data?.message || "Failed to surrender access",
+      );
     } finally {
       setActingGroupGrantId(null);
       setConfirmingGroupGrantId(null);
@@ -142,14 +147,18 @@ const MyAccessPage = () => {
       return;
     }
 
-    setError("");
     setLeavingGroupId(groupId);
+
+    const groupName = memberships.find((m) => m.groupId === groupId)?.group
+      ?.name;
+
     try {
       await leaveGroup(groupId);
       setMemberships((prev) => prev.filter((m) => m.groupId !== groupId));
       setGroupGrants((prev) => prev.filter((g) => g.groupId !== groupId));
+      toast.success(groupName ? `Left "${groupName}"` : "Left group");
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to leave group");
+      toast.error(err.response?.data?.message || "Failed to leave group");
     } finally {
       setLeavingGroupId(null);
       setConfirmingLeaveId(null);
@@ -166,7 +175,6 @@ const MyAccessPage = () => {
           Manage your current grants and group memberships.
         </p>
 
-        {error && <p className="mt-3 text-xs text-danger font-mono">{error}</p>}
 
         <div className="mt-6 rounded-xl border border-border-dark bg-surface-raised overflow-hidden">
           <div className="flex items-center gap-2 px-5 py-4 border-b border-border-dark">

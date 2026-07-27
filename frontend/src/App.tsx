@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { ToastProvider } from "./context/ToastContext";
 import { Shield } from "lucide-react";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -135,11 +136,13 @@ const AppRoutes = () => {
 
 const App = () => {
   return (
-    <AuthProvider>
-      <div className="min-h-screen bg-bg">
-        <AppRoutes />
-      </div>
-    </AuthProvider>
+    <ToastProvider>
+      <AuthProvider>
+        <div className="min-h-screen bg-bg">
+          <AppRoutes />
+        </div>
+      </AuthProvider>
+    </ToastProvider>
   );
 };
 

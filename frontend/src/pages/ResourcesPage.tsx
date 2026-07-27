@@ -7,6 +7,7 @@ import { ResourceCardSkeleton } from "../components/ResourceCardSkeleton";
 import { CreateResourceModal } from "../components/createResourceModal";
 import type { Resource } from "../types";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 
 const ROLE_BADGE_STYLES: Record<string, string> = {
   admin: "bg-danger/15 text-danger",
@@ -16,6 +17,7 @@ const ROLE_BADGE_STYLES: Record<string, string> = {
 
 const ResourcesPage = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
   const [scope, setScope] = useState<"mine" | "all">("all");
@@ -41,6 +43,7 @@ const ResourcesPage = () => {
 
   const handleCreated = (resource: Resource) => {
     setResources((prev) => [resource, ...prev]);
+    toast.success(`Resource "${resource.name}" created`);
   };
 
   const filteredResources = resources.filter((r) =>

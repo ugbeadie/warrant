@@ -24,6 +24,7 @@ import { RequestAccessModal } from "../components/RequestAccessModal";
 import { EditResourceModal } from "../components/EditResourceModal";
 import { ConfirmDeleteModal } from "../components/ConfirmDeleteModal";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import { useNavigate } from "react-router-dom";
 import type {
   Resource,
@@ -52,6 +53,7 @@ const ResourceDetailPage = () => {
   console.log("ResourceDetailPage mounted/rendered");
   const { id } = useParams<{ id: string }>();
   const { user, sessionLoading } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
 
   const [resource, setResource] = useState<Resource | null>(null);
@@ -136,6 +138,9 @@ const ResourceDetailPage = () => {
       );
 
       await refreshAccess();
+      toast.success("Grant revoked");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to revoke grant");
     } finally {
       setActingGrantId(null);
       setActingAction(null);
@@ -149,6 +154,9 @@ const ResourceDetailPage = () => {
       await deleteGrant(grantId);
       setGrants((prev) => prev.filter((g) => g.id !== grantId));
       await refreshAccess();
+      toast.success("Grant record deleted");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to delete grant");
     } finally {
       setActingGrantId(null);
       setActingAction(null);
@@ -159,10 +167,10 @@ const ResourceDetailPage = () => {
     setDeleteError("");
     setDeleting(true);
     try {
+      const deletedName = resource!.name;
       await deleteResource(resource!.id);
-      navigate("/resources", {
-        state: { deletedResourceName: resource!.name },
-      });
+      toast.success(`Resource "${deletedName}" deleted`);
+      navigate("/resources");
     } catch (err: any) {
       setDeleteError(
         err.response?.data?.message || "Failed to delete resource",
@@ -178,6 +186,11 @@ const ResourceDetailPage = () => {
   const handleRequestSubmitted = async (submittedGroupId: string | null) => {
     setShowRequestModal(false);
     setRefreshingAfterSubmit(true);
+    toast.success(
+      isOwner
+        ? "Access session logged"
+        : "Access request submitted for approval",
+    );
     try {
       await Promise.all([
         refreshAccess(),
@@ -484,7 +497,10 @@ const ResourceDetailPage = () => {
         <EditResourceModal
           resource={resource}
           onClose={() => setShowEditModal(false)}
-          onUpdated={(updated) => setResource(updated)}
+          onUpdated={(updated) => {
+            setResource(updated);
+            toast.success(`Resource "${updated.name}" updated`);
+          }}
         />
       )}
       {showConfirmDeleteModal && (
