@@ -5,6 +5,7 @@ const GRANT_INCLUDE = {
   role: true,
   user: { select: { id: true, username: true } },
   group: { select: { id: true, name: true, ownerId: true } },
+  request: { select: { reason: true } },
 };
 
 const revokeGrant = async (req, res) => {

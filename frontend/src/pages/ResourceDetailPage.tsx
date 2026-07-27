@@ -379,7 +379,7 @@ const ResourceDetailPage = () => {
                   </p>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[560px] text-sm">
+                    <table className="w-full min-w-175 text-sm">
                       <thead>
                         <tr className="text-[10px] font-mono uppercase tracking-widest text-on-dark-muted">
                           <th className="text-left font-medium px-5 py-2">
@@ -390,6 +390,9 @@ const ResourceDetailPage = () => {
                           </th>
                           <th className="text-left font-medium px-2 py-2">
                             Expires
+                          </th>
+                          <th className="text-left font-medium px-2 py-2">
+                            Justification
                           </th>
                           <th className="text-right font-medium px-5 py-2">
                             Actions
@@ -422,6 +425,14 @@ const ResourceDetailPage = () => {
                               {grant.status === "ACTIVE"
                                 ? expiresLabel(grant.expiresAt)
                                 : grant.status}
+                            </td>
+                            <td className="px-2 py-3 text-on-dark-muted text-xs">
+                              <span
+                                className="block max-w-55 truncate"
+                                title={grant.request?.reason ?? undefined}
+                              >
+                                {grant.request?.reason ?? "—"}
+                              </span>
                             </td>
                             <td className="px-5 py-3 text-right whitespace-nowrap">
                               {grant.status === "ACTIVE" ? (
