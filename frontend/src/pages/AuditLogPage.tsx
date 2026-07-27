@@ -101,6 +101,7 @@ const DETAIL_KEY_LABELS: Record<string, string> = {
   requesterUsername: "Requester",
   requestedRoleName: "Requested Role",
   durationMinutes: "Duration (min)",
+  justification: "Justification",
   revokedByRole: "Revoked By",
   newOwnerUsername: "New Owner",
   previousOwnerUsername: "Previous Owner",
@@ -365,19 +366,35 @@ const AuditLogPage = () => {
                                       </dd>
                                     </div>
                                   )}
-                                  {detailKeys.map((key) => (
-                                    <div
-                                      key={key}
-                                      className="flex justify-between sm:justify-start sm:gap-3"
-                                    >
-                                      <dt className="text-[10px] font-mono uppercase tracking-widest text-on-dark-muted">
-                                        {DETAIL_KEY_LABELS[key] ?? key}
-                                      </dt>
-                                      <dd className="text-xs font-mono text-on-dark break-all">
-                                        {String(detailObj[key])}
-                                      </dd>
-                                    </div>
-                                  ))}
+                                  {detailKeys.map((key) => {
+                                    // Free text, unlike the short scalars
+                                    // beside it — give it the full row.
+                                    const isProse = key === "justification";
+
+                                    return (
+                                      <div
+                                        key={key}
+                                        className={
+                                          isProse
+                                            ? "sm:col-span-2 flex flex-col gap-1"
+                                            : "flex justify-between sm:justify-start sm:gap-3"
+                                        }
+                                      >
+                                        <dt className="text-[10px] font-mono uppercase tracking-widest text-on-dark-muted">
+                                          {DETAIL_KEY_LABELS[key] ?? key}
+                                        </dt>
+                                        <dd
+                                          className={`text-xs font-mono text-on-dark ${
+                                            isProse
+                                              ? "wrap-break-word whitespace-pre-wrap"
+                                              : "break-all"
+                                          }`}
+                                        >
+                                          {String(detailObj[key])}
+                                        </dd>
+                                      </div>
+                                    );
+                                  })}
                                 </dl>
                               )}
                             </td>
