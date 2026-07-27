@@ -113,6 +113,9 @@ export interface CheckAccessResult {
   source?: "direct" | "group";
   group?: Group;
   grant?: Grant;
+  // Role of the caller's own active grant, if any. Null when access comes from
+  // a group grant, since that does not constrain what they may request alone.
+  currentRole?: Role | null;
 }
 
 export interface AuditLogEntry {

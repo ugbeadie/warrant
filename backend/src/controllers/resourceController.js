@@ -151,11 +151,18 @@ const checkResourceAccess = async (req, res) => {
 
     const result = await checkAccess(req.user.id, req.params.id);
 
+    // Only a USER grant is reported: createAccessRequest gates personal
+    // requests on the caller's own grants, so a group-held role must not be
+    // used to narrow what they can request for themselves.
+    const currentRole =
+      result.grant?.subjectType === "USER" ? (result.grant.role ?? null) : null;
+
     if (!result.hasAccess) {
       return res.status(403).json({
         message: "Access denied",
         reason: result.reason,
         insufficient: !!result.insufficient,
+        currentRole,
       });
     }
 
@@ -163,6 +170,7 @@ const checkResourceAccess = async (req, res) => {
       message: "Access granted",
       reason: result.reason,
       source: result.source,
+      currentRole,
     });
   } catch (error) {
     console.error(error);

@@ -3,8 +3,9 @@ import { X } from "lucide-react";
 import { createAccessRequest } from "../lib/requests";
 import { fetchPolicyRulesForResource } from "../lib/resources";
 import { fetchMyOwnedGroups } from "../lib/groups";
+import { ROLE_OPTIONS, ROLE_RANKS, MAX_ROLE_RANK } from "../lib/roles";
 import { useAuth } from "../context/AuthContext";
-import type { Resource, Group } from "../types";
+import type { Resource, Group, Role } from "../types";
 
 const DURATION_OPTIONS = [
   { label: "1 Hour", minutes: 60 },
@@ -14,15 +15,10 @@ const DURATION_OPTIONS = [
   { label: "Custom", minutes: -1 },
 ];
 
-const ROLE_RANKS: Record<string, number> = {
-  viewer: 1,
-  editor: 2,
-  admin: 3,
-};
-
 interface RequestAccessModalProps {
   resource: Resource;
   isOwner?: boolean;
+  currentRole?: Role | null;
   onClose: () => void;
   onSubmitted: (groupId: string | null) => void;
 }
@@ -30,6 +26,7 @@ interface RequestAccessModalProps {
 export const RequestAccessModal = ({
   resource,
   isOwner = false,
+  currentRole = null,
   onClose,
   onSubmitted,
 }: RequestAccessModalProps) => {
@@ -53,12 +50,26 @@ export const RequestAccessModal = ({
   const isCustom = durationChoice === -1;
   const requestingAsGroup = !!onBehalfOfGroupId;
 
+  // A request is only accepted if it raises the subject's rank, and the backend
+  // scopes that to the subject being requested for — so the caller's own grant
+  // must not constrain a request made on behalf of a group.
+  const lockedRank = requestingAsGroup ? 0 : (currentRole?.rank ?? 0);
+  const allRolesHeld = lockedRank >= MAX_ROLE_RANK;
+
   const durationMinutes = useMemo(() => {
     if (!isCustom) return durationChoice;
     const multiplier =
       customUnit === "minutes" ? 1 : customUnit === "hours" ? 60 : 1440;
     return Math.max(1, Math.round(customValue * multiplier));
   }, [isCustom, durationChoice, customValue, customUnit]);
+
+  // Keep the selection on a role that can actually be requested.
+  useEffect(() => {
+    if (ROLE_RANKS[requestedRoleName] > lockedRank) return;
+
+    const lowest = ROLE_OPTIONS.find((r) => r.rank > lockedRank);
+    if (lowest) setRequestedRoleName(lowest.value);
+  }, [lockedRank, requestedRoleName]);
 
   useEffect(() => {
     if (isOwner || !user) return;
@@ -196,12 +207,27 @@ export const RequestAccessModal = ({
             <select
               value={requestedRoleName}
               onChange={(e) => setRequestedRoleName(e.target.value)}
-              className="w-full rounded-md border border-border-dark bg-bg px-3 py-2.5 text-sm text-on-dark font-mono cursor-pointer outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+              disabled={allRolesHeld}
+              className="w-full rounded-md border border-border-dark bg-bg px-3 py-2.5 text-sm text-on-dark font-mono cursor-pointer outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <option value="viewer">Viewer</option>
-              <option value="editor">Editor</option>
-              <option value="admin">Admin</option>
+              {ROLE_OPTIONS.map((role) => (
+                <option
+                  key={role.value}
+                  value={role.value}
+                  disabled={role.rank <= lockedRank}
+                >
+                  {role.label}
+                  {role.rank <= lockedRank ? " — already held" : ""}
+                </option>
+              ))}
             </select>
+            {lockedRank > 0 && !allRolesHeld && (
+              <p className="mt-1.5 text-[11px] font-mono text-on-dark-muted">
+                You already hold{" "}
+                <span className="font-semibold">{currentRole?.name}</span> — only
+                a higher role can be requested.
+              </p>
+            )}
             {belowRequiredRole && (
               <p className="mt-1.5 text-[11px] font-mono text-warning">
                 This resource requires at least{" "}
@@ -266,7 +292,13 @@ export const RequestAccessModal = ({
             />
           </div>
 
-          {isOwner ? (
+          {allRolesHeld ? (
+            <div className="rounded-md border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
+              You already hold the highest role (
+              <span className="font-semibold">{currentRole?.name}</span>) on this
+              resource — there is nothing higher to request.
+            </div>
+          ) : isOwner ? (
             <div className="rounded-md border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
               You own this resource — this will auto-approve instantly and be
               logged for audit purposes.
@@ -303,7 +335,7 @@ export const RequestAccessModal = ({
             </button>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || allRolesHeld}
               className="rounded-md bg-brand px-5 py-2 text-xs font-mono font-semibold uppercase tracking-wide text-white cursor-pointer hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
               {submitting ? "Submitting..." : "Submit_Request"}

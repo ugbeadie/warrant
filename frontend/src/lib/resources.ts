@@ -32,12 +32,18 @@ export const checkResourceAccess = async (
 ): Promise<CheckAccessResult> => {
   try {
     const { data } = await api.get(`/resources/${id}/access-check`);
-    return { hasAccess: true, reason: data.reason, source: data.source };
+    return {
+      hasAccess: true,
+      reason: data.reason,
+      source: data.source,
+      currentRole: data.currentRole ?? null,
+    };
   } catch (err: any) {
     return {
       hasAccess: false,
       insufficient: !!err.response?.data?.insufficient,
       reason: err.response?.data?.reason ?? "Access denied.",
+      currentRole: err.response?.data?.currentRole ?? null,
     };
   }
 };

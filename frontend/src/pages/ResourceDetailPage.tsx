@@ -18,6 +18,7 @@ import {
   deleteGrant,
 } from "../lib/resources";
 import { fetchMyRequestForResource } from "../lib/requests";
+import { MAX_ROLE_RANK } from "../lib/roles";
 import { AppLayout } from "../components/AppLayout";
 import { ResourceDetailSkeleton } from "../components/ResourceDetailSkeleton";
 import { RequestAccessModal } from "../components/RequestAccessModal";
@@ -221,6 +222,10 @@ const ResourceDetailPage = () => {
   const roleKey = resource.requiredRole.name.toLowerCase();
   const isRequestPending = myRequest?.status === "PENDING";
 
+  // Nothing higher left to request, so offering the action would only lead to a
+  // modal that rejects every option.
+  const atMaxRole = (access?.currentRole?.rank ?? 0) >= MAX_ROLE_RANK;
+
   return (
     <AppLayout>
       <div className="">
@@ -281,6 +286,24 @@ const ResourceDetailPage = () => {
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 Updating...
               </span>
+            ) : access?.hasAccess ? (
+              <>
+                <span className="rounded-md border border-success/30 bg-success/10 px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-success">
+                  Access Granted
+                </span>
+                {isRequestPending ? (
+                  <span className="rounded-md border border-warning/30 bg-warning/10 px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-warning">
+                    Pending Approval
+                  </span>
+                ) : atMaxRole ? null : (
+                  <button
+                    onClick={handleRequestAccessClick}
+                    className="rounded-md border border-border-dark px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-on-dark cursor-pointer hover:bg-bg transition shrink-0"
+                  >
+                    {isOwner ? "Log_Access_Session" : "Request_Higher_Role"}
+                  </button>
+                )}
+              </>
             ) : isOwner ? (
               <button
                 onClick={handleRequestAccessClick}
@@ -288,10 +311,6 @@ const ResourceDetailPage = () => {
               >
                 Log_Access_Session
               </button>
-            ) : access?.hasAccess ? (
-              <span className="rounded-md border border-success/30 bg-success/10 px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-success">
-                Access Granted
-              </span>
             ) : isRequestPending ? (
               <span className="rounded-md border border-warning/30 bg-warning/10 px-4 py-2.5 text-xs font-mono uppercase tracking-wide text-warning">
                 Pending Approval
@@ -485,6 +504,7 @@ const ResourceDetailPage = () => {
         <RequestAccessModal
           resource={resource}
           isOwner={isOwner}
+          currentRole={access?.currentRole ?? null}
           onClose={() => setShowRequestModal(false)}
           onSubmitted={handleRequestSubmitted}
         />
