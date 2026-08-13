@@ -14,7 +14,7 @@ import startExpiryJob from "./jobs/expiryJob.js";
 import startUnusedAccessJob from "./jobs/unusedAccessJob.js";
 import auditLogRoute from "./routes/auditLogRoute.js";
 import adminRoute from "./routes/adminRoute.js";
-// import { authLimiter, generalLimiter } from "./middlewares/rateLimiter.js";
+import { authLimiter, generalLimiter } from "./middlewares/rateLimiter.js";
 
 dotenv.config();
 
@@ -34,8 +34,8 @@ app.use(
 
 app.use(express.json());
 
-// app.use("/api/auth", authLimiter);
-// app.use("/api", generalLimiter);
+app.use("/api/auth", authLimiter);
+app.use("/api", generalLimiter);
 
 const PORT = process.env.PORT || 7001;
 
