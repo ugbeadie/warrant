@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon src/app.js",
     "seed": "node prisma/seed.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node src/app.js"
   },
   "keywords": [],
   "author": "",
@@ -14,16 +15,17 @@
   "type": "module",
   "dependencies": {
     "@prisma/client": "^6.19.3",
+    "prisma": "^6.19.3",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.6.0",
     "jsonwebtoken": "^9.0.3",
-    "node-cron": "^4.6.0"
+    "node-cron": "^4.6.0",
+    "postinstall": "prisma generate"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14",
-    "prisma": "^6.19.3"
+    "nodemon": "^3.1.14"
   }
 }
