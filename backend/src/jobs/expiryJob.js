@@ -1,4 +1,3 @@
-import cron from "node-cron";
 import prisma from "../config/prisma.js";
 
 let isRunning = false;
@@ -115,7 +114,7 @@ const sendExpiryWarnings = async () => {
   }
 };
 
-const runExpirySweep = async () => {
+export const runExpirySweep = async () => {
   if (isRunning) {
     console.log("Expiry sweep already in progress, skipping this run");
     return;
@@ -133,10 +132,3 @@ const runExpirySweep = async () => {
     isRunning = false;
   }
 };
-
-const startExpiryJob = () => {
-  cron.schedule("*/5 * * * *", runExpirySweep);
-  console.log("Expiry cron job scheduled (every 5 minutes)");
-};
-
-export default startExpiryJob;

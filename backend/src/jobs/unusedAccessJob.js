@@ -1,4 +1,3 @@
-import cron from "node-cron";
 import prisma from "../config/prisma.js";
 
 const UNUSED_THRESHOLD_DAYS = 3;
@@ -68,7 +67,7 @@ const flagUnusedGrants = async () => {
 
 let isRunning = false;
 
-const runUnusedAccessSweep = async () => {
+export const runUnusedAccessSweep = async () => {
   if (isRunning) {
     console.log("Unused-access sweep already in progress, skipping this run");
     return;
@@ -84,10 +83,3 @@ const runUnusedAccessSweep = async () => {
     isRunning = false;
   }
 };
-
-const startUnusedAccessJob = () => {
-  cron.schedule("0 3 * * *", runUnusedAccessSweep);
-  console.log("Unused-access cron job scheduled (daily at 3am)");
-};
-
-export default startUnusedAccessJob;

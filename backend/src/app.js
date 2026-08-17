@@ -10,10 +10,9 @@ import policyRuleRoute from "./routes/policyRuleRoute.js";
 import grantRoute from "./routes/grantRoute.js";
 import notificationRoute from "./routes/notificationRoute.js";
 import userRoute from "./routes/userRoute.js";
-import startExpiryJob from "./jobs/expiryJob.js";
-import startUnusedAccessJob from "./jobs/unusedAccessJob.js";
 import auditLogRoute from "./routes/auditLogRoute.js";
 import adminRoute from "./routes/adminRoute.js";
+import jobRoute from "./routes/jobRoute.js";
 import { authLimiter, generalLimiter } from "./middlewares/rateLimiter.js";
 
 dotenv.config();
@@ -53,6 +52,7 @@ app.use("/api/notifications", notificationRoute);
 app.use("/api/audit-log", auditLogRoute);
 app.use("/api/users", userRoute);
 app.use("/api/admin", adminRoute);
+app.use("/api/jobs", jobRoute);
 
 const startServer = async () => {
   try {
@@ -60,8 +60,6 @@ const startServer = async () => {
     console.log("Connected to PostgreSQL via Prisma");
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
-      startExpiryJob();
-      startUnusedAccessJob();
     });
   } catch (error) {
     console.error("Failed to start server:", error.message);
