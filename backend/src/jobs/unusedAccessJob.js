@@ -2,10 +2,11 @@ import prisma from "../config/prisma.js";
 
 const UNUSED_THRESHOLD_DAYS = 3;
 
+let isRunning = false;
+
 const flagUnusedGrants = async () => {
-  const now = new Date();
   const thresholdDate = new Date(
-    now.getTime() - UNUSED_THRESHOLD_DAYS * 24 * 60 * 60 * 1000,
+    Date.now() - UNUSED_THRESHOLD_DAYS * 24 * 60 * 60 * 1000,
   );
 
   const staleGrants = await prisma.grant.findMany({
@@ -18,6 +19,8 @@ const flagUnusedGrants = async () => {
     },
     include: { resource: { include: { owner: true } }, role: true },
   });
+
+  let flagged = 0;
 
   for (const grant of staleGrants) {
     const alreadyFlagged = await prisma.auditLog.findFirst({
@@ -49,23 +52,24 @@ const flagUnusedGrants = async () => {
         message: `A grant on "${grant.resource.name}" hasn't been used in ${UNUSED_THRESHOLD_DAYS}+ days and may be worth reviewing.`,
       },
     });
+
     if (grant.subjectType === "USER" && grant.userId) {
       await prisma.notification.create({
         data: {
           userId: grant.userId,
           type: "UNUSED_ACCESS_FLAGGED",
-          message: `Your ${grant.role?.name ?? ""} access to "${grant.resource.name}" hasn't been used in ${UNUSED_THRESHOLD_DAYS}+ days.`,
+          message: `Your ${grant.role.name} access to "${grant.resource.name}" hasn't been used in ${UNUSED_THRESHOLD_DAYS}+ days.`,
         },
       });
     }
+
+    flagged += 1;
   }
 
-  if (staleGrants.length > 0) {
-    console.log(`Flagged ${staleGrants.length} unused grant(s)`);
+  if (flagged > 0) {
+    console.log(`Flagged ${flagged} unused grant(s)`);
   }
 };
-
-let isRunning = false;
 
 export const runUnusedAccessSweep = async () => {
   if (isRunning) {

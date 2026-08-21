@@ -1,4 +1,5 @@
 import prisma from "../config/prisma.js";
+import { expireGrantsWhere } from "../lib/expireIfDue.js";
 
 const GRANT_INCLUDE = {
   resource: { include: { owner: { select: { id: true, username: true } } } },
@@ -97,6 +98,8 @@ const revokeGrant = async (req, res) => {
 
 const getResourceGrants = async (req, res) => {
   try {
+    await expireGrantsWhere({ resourceId: req.params.resourceId });
+
     const grants = await prisma.grant.findMany({
       where: { resourceId: req.params.resourceId },
       include: GRANT_INCLUDE,
@@ -105,7 +108,7 @@ const getResourceGrants = async (req, res) => {
 
     res.status(200).json({ grants });
   } catch (error) {
-    console.error(error);
+    console.error("getResourceGrants failed", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -205,6 +208,8 @@ const surrenderGrant = async (req, res) => {
 
 const getMyGrants = async (req, res) => {
   try {
+    await expireGrantsWhere({ subjectType: "USER", userId: req.user.id });
+
     const grants = await prisma.grant.findMany({
       where: { subjectType: "USER", userId: req.user.id },
       include: GRANT_INCLUDE,
@@ -213,7 +218,7 @@ const getMyGrants = async (req, res) => {
 
     res.status(200).json({ grants });
   } catch (error) {
-    console.error(error);
+    console.error("getMyGrants failed", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };

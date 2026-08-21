@@ -1,5 +1,6 @@
 import prisma from "../config/prisma.js";
 import checkAccess from "../lib/checkAccess.js";
+import { expireMembershipsForUser } from "../lib/expireIfDue.js";
 
 const RESOURCE_INCLUDE = {
   owner: { select: { id: true, username: true, email: true } },
@@ -316,6 +317,8 @@ const deleteResource = async (req, res) => {
 
 const getMyGroupGrants = async (req, res) => {
   try {
+    await expireMembershipsForUser(req.user.id);
+
     const now = new Date();
 
     const activeMemberships = await prisma.groupMember.findMany({

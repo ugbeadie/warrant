@@ -1,26 +1,42 @@
 import prisma from "../config/prisma.js";
 
+// Status correctness is handled on read by lib/expireIfDue.js, so this job only
+// notifies. That means it can run hourly without anything ever being wrong — a
+// late notification is a different problem from a stale status.
+const WARNING_WINDOW_MINUTES = 60;
+
 let isRunning = false;
 
-const sweepExpiredGrants = async () => {
-  const now = new Date();
+// Deduped against the audit log rather than the notification text. Matching on
+// a resource name meant a second grant on the same resource never got its own
+// notification, and a resource called "API" matched "API Gateway".
+const alreadyLogged = async (action, grantId) =>
+  Boolean(
+    await prisma.auditLog.findFirst({
+      where: { action, detail: { path: ["grantId"], equals: grantId } },
+    }),
+  );
 
+const notifyExpiredGrants = async () => {
   const expiredGrants = await prisma.grant.findMany({
-    where: { status: "ACTIVE", expiresAt: { lte: now } },
+    where: {
+      status: { in: ["ACTIVE", "EXPIRED"] },
+      expiresAt: { lte: new Date() },
+    },
     include: { resource: true },
   });
 
+  let notified = 0;
+
   for (const grant of expiredGrants) {
-    await prisma.grant.update({
-      where: { id: grant.id },
-      data: { status: "EXPIRED" },
-    });
+    if (await alreadyLogged("GRANT_EXPIRED", grant.id)) continue;
 
     await prisma.auditLog.create({
       data: {
         actorId: grant.userId || grant.resource.ownerId,
         action: "GRANT_EXPIRED",
         resourceId: grant.resourceId,
+        createdAt: grant.expiresAt,
         detail: { grantId: grant.id, subjectType: grant.subjectType },
       },
     });
@@ -34,33 +50,41 @@ const sweepExpiredGrants = async () => {
         },
       });
     }
+
+    notified += 1;
   }
 
-  if (expiredGrants.length > 0) {
-    console.log(`Expired ${expiredGrants.length} grant(s)`);
+  if (notified > 0) {
+    console.log(`Notified ${notified} expired grant(s)`);
   }
 };
 
-const sweepExpiredMemberships = async () => {
-  const now = new Date();
+const notifyExpiredMemberships = async () => {
   const expiredMemberships = await prisma.groupMember.findMany({
     where: {
-      status: "ACTIVE",
-      expiresAt: { not: null, lte: now },
+      status: { in: ["ACTIVE", "EXPIRED"] },
+      expiresAt: { not: null, lte: new Date() },
     },
     include: { group: true },
   });
 
+  let notified = 0;
+
   for (const membership of expiredMemberships) {
-    await prisma.groupMember.update({
-      where: { id: membership.id },
-      data: { status: "EXPIRED" },
+    const logged = await prisma.auditLog.findFirst({
+      where: {
+        action: "GROUP_MEMBERSHIP_EXPIRED",
+        detail: { path: ["membershipId"], equals: membership.id },
+      },
     });
+
+    if (logged) continue;
 
     await prisma.auditLog.create({
       data: {
         actorId: membership.userId,
         action: "GROUP_MEMBERSHIP_EXPIRED",
+        createdAt: membership.expiresAt,
         detail: { groupId: membership.groupId, membershipId: membership.id },
       },
     });
@@ -72,45 +96,57 @@ const sweepExpiredMemberships = async () => {
         message: `Your membership in "${membership.group.name}" has expired.`,
       },
     });
+
+    notified += 1;
   }
 
-  if (expiredMemberships.length > 0) {
-    console.log(`Expired ${expiredMemberships.length} group membership(s)`);
+  if (notified > 0) {
+    console.log(`Notified ${notified} expired membership(s)`);
   }
 };
 
 const sendExpiryWarnings = async () => {
   const now = new Date();
-  const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
+  const windowEnd = new Date(
+    now.getTime() + WARNING_WINDOW_MINUTES * 60 * 1000,
+  );
 
   const soonToExpire = await prisma.grant.findMany({
     where: {
       status: "ACTIVE",
-      expiresAt: { gt: now, lte: fiveMinutesFromNow },
+      expiresAt: { gt: now, lte: windowEnd },
     },
     include: { resource: true },
   });
 
+  let warned = 0;
+
   for (const grant of soonToExpire) {
     if (!grant.userId) continue;
+    if (await alreadyLogged("GRANT_EXPIRING_SOON", grant.id)) continue;
 
-    const alreadyWarned = await prisma.notification.findFirst({
-      where: {
-        userId: grant.userId,
-        type: "GRANT_EXPIRING_SOON",
-        message: { contains: grant.resource.name },
+    await prisma.auditLog.create({
+      data: {
+        actorId: grant.userId,
+        action: "GRANT_EXPIRING_SOON",
+        resourceId: grant.resourceId,
+        detail: { grantId: grant.id },
       },
     });
-
-    if (alreadyWarned) continue;
 
     await prisma.notification.create({
       data: {
         userId: grant.userId,
         type: "GRANT_EXPIRING_SOON",
-        message: `Your access to "${grant.resource.name}" expires in 5 minutes.`,
+        message: `Your access to "${grant.resource.name}" expires within the hour.`,
       },
     });
+
+    warned += 1;
+  }
+
+  if (warned > 0) {
+    console.log(`Warned about ${warned} grant(s) expiring soon`);
   }
 };
 
@@ -123,8 +159,8 @@ export const runExpirySweep = async () => {
   isRunning = true;
 
   try {
-    await sweepExpiredGrants();
-    await sweepExpiredMemberships();
+    await notifyExpiredGrants();
+    await notifyExpiredMemberships();
     await sendExpiryWarnings();
   } catch (error) {
     console.error("Expiry job failed:", error.message);
