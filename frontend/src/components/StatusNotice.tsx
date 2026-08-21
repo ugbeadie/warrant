@@ -4,14 +4,14 @@ export const StatusNotice = () => (
       Warrant is offline until 1 September.
     </p>
     <p className="mt-1.5">
-      The free-tier database hit its monthly compute limit. A background job was
-      sweeping every five minutes against a database that suspends after five
-      minutes idle, so it never slept and billed around the clock.
+      A background job was sweeping every five minutes against a database that
+      suspends after five minutes idle, so it never slept and used its whole
+      monthly compute allowance.
     </p>
     <p className="mt-1.5">
       That's fixed. Expiry now happens when a page reads a grant rather than on
       a schedule, and the sweep only sends notifications, hourly. It comes back
-      with the quota and stays up.
+      when the allowance resets and stays up.
     </p>
     <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1">
       <a
