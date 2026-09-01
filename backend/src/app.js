@@ -20,14 +20,11 @@ dotenv.config();
 const app = express();
 app.set("trust proxy", 1);
 
-const origin =
-  process.env.NODE_ENV === "production"
-    ? "https://warrant.ugbeadie.com"
-    : "http://localhost:5173";
+const allowedOrigins = ["https://warrant.ugbeadie.com", "http://localhost:5173"];
 
 app.use(
   cors({
-    origin,
+    origin: allowedOrigins,
     credentials: true,
   }),
 );
