@@ -1,7 +1,7 @@
 export const StatusNotice = () => (
   <div className="mb-6 rounded-md border border-amber-500/30 bg-amber-500/10 px-3.5 py-3 text-xs leading-relaxed text-on-dark-muted">
     <p className="font-medium text-amber-200">
-      Warrant is offline until 1 September.
+      Warrant is offline until the monthly compute allowance resets.
     </p>
     <p className="mt-1.5">
       A background job was sweeping every five minutes against a database that
