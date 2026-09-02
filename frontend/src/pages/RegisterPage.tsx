@@ -1,7 +1,6 @@
 import { useNavigate, Link } from "react-router-dom";
 import { Shield } from "lucide-react";
 import { AuthForm } from "../components/AuthForm";
-import { StatusNotice } from "../components/StatusNotice";
 
 const RegisterPage = () => {
   const navigate = useNavigate();
@@ -30,7 +29,6 @@ const RegisterPage = () => {
 
       <div className="flex items-center justify-center bg-surface-raised px-6 py-12">
         <div className="w-full max-w-sm">
-          <StatusNotice />
           <AuthForm mode="register" onSuccess={() => navigate("/")} />
           <p className="mt-6 text-center text-sm text-on-dark-muted">
             Already have an account?{" "}
